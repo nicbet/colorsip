@@ -241,7 +241,18 @@ struct Vector3: Sendable, Equatable {
 
     func map(_ f: (Double) -> Double) -> Vector3 { Vector3(f(x), f(y), f(z)) }
 
-    var length: Double { (x * x + y * y + z * z).squareRoot() }
+    var length: Double { lengthSquared.squareRoot() }
+
+    var lengthSquared: Double { x * x + y * y + z * z }
+
+    /// The component on `axis`: 0 is x, 1 is y, 2 is z.
+    subscript(axis: Int) -> Double {
+        switch axis {
+        case 0: x
+        case 1: y
+        default: z
+        }
+    }
 
     /// Whether every component is within 0–1, allowing for rounding error.
     var isInUnitCube: Bool {

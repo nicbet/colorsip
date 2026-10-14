@@ -70,3 +70,11 @@ CI (GitHub Actions) runs the Core tests and builds the app on every push and pul
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+## Third-party
+
+- Color names come from [meodai/color-name-list](https://github.com/meodai/color-name-list)
+  v14.54.2 by David Aerne, MIT licensed. The list and its license are bundled in
+  `Packages/ColorsipCore/Sources/ColorsipCore/Resources/`. To update it, replace `colornames.csv`
+  with the `dist/colornames.csv` of a newer `color-name-list` npm release, and update the version
+  here, in `Package.swift`, and in the entry-count test.
