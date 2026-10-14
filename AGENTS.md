@@ -235,3 +235,23 @@ may use different naming conventions). The table uses the base tool names.
 | `artifact` | Manage generic artifacts attached to an issue |
 
 <!-- xpo:end -->
+
+## Development practice
+
+The product spec is `spec.md`. Each issue's spec refines it.
+
+### Test-driven development
+
+All work follows TDD:
+
+1. **Tests first.** Turn the issue spec's acceptance criteria, flows and edge cases into tests before
+   writing any implementation.
+2. **Red.** Run the tests and confirm they fail for the expected reason. A test that passes before
+   the implementation exists tests nothing.
+3. **Green.** Write the simplest implementation that makes the tests pass.
+4. **Refactor.** Clean up with the tests green.
+
+Put logic in `ColorsipCore` (Swift Testing, `swift test` in `Packages/ColorsipCore`) so it can be
+tested this way. Keep the app target a thin layer over it. If a behavior can't be covered by an
+automated test (for example screen capture or event taps), say so in the completion comment and
+describe how it was verified by hand.

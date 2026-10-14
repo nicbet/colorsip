@@ -4,3 +4,16 @@
 .xpo/worktrees/
 .xpo/chats/
 /design
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
