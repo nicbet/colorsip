@@ -1,0 +1,54 @@
+import AppKit
+import SwiftUI
+
+/// The menubar icon and its popover (`spec.md` §3.1). The popover can't be detached.
+@MainActor
+final class StatusItemController: NSObject, NSPopoverDelegate {
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let popover = NSPopover()
+
+    init(model: AppModel, actions: PopoverActions) {
+        super.init()
+
+        // Every action dismisses the popover first, so a window it opens isn't covered by it.
+        let popover = popover
+        func closing(_ action: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
+            { popover.performClose(nil); action() }
+        }
+        let actions = PopoverActions(
+            picker: closing(actions.picker),
+            newPalette: actions.newPalette,
+            settings: closing(actions.settings),
+            quit: actions.quit
+        )
+
+        popover.behavior = .transient
+        popover.animates = true
+        popover.delegate = self
+        let content = NSHostingController(rootView: PopoverView(model: model, actions: actions))
+        content.sizingOptions = .preferredContentSize
+        popover.contentViewController = content
+
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "eyedropper.halffull", accessibilityDescription: "Colorsip")
+            button.image?.isTemplate = true
+            button.target = self
+            button.action = #selector(togglePopover(_:))
+        }
+    }
+
+    @objc private func togglePopover(_ sender: NSStatusBarButton) {
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            // An agent app has to be active for the transient popover to take key and close on
+            // outside clicks.
+            NSApp.activate()
+            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        }
+    }
+
+    func popoverShouldDetach(_ popover: NSPopover) -> Bool {
+        false
+    }
+}
