@@ -65,11 +65,11 @@ public enum SettingsPane: String, Sendable, CaseIterable {
         }
     }
 
-    /// Whether the pane has content yet. Profiles comes with cs-615265 and Permissions with
-    /// cs-0fb394; until then they're hidden rather than shown empty.
+    /// Whether the pane has content yet. Profiles comes with cs-615265; until then it's hidden
+    /// rather than shown empty.
     var hasContent: Bool {
         switch self {
-        case .profiles, .permissions: false
+        case .profiles: false
         default: true
         }
     }

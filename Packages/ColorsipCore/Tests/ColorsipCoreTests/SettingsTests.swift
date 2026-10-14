@@ -194,16 +194,29 @@ struct LocalSettingsTests {
         defaults.set("teleport", forKey: "settingsPane")
         #expect(LocalSettings(defaults: defaults).settingsPane == .general)
     }
+
+    @Test func remembersSkippedPermissions() throws {
+        let temp = try TemporaryDefaults()
+        #expect(temp.localSettings.skippedPermissions.isEmpty)
+        temp.localSettings.skippedPermissions = [.accessibility]
+        #expect(temp.localSettings.skippedPermissions == [.accessibility])
+    }
+
+    @Test func unknownSkippedPermissionsAreIgnored() throws {
+        let temp = try TemporaryDefaults()
+        temp.defaults.set(["accessibility", "telepathy"], forKey: "skippedPermissions")
+        #expect(temp.localSettings.skippedPermissions == [.accessibility])
+    }
 }
 
 @Suite("AppSettings panes")
 struct SettingsPaneTests {
-    @Test func mvpShowsGeneralShortcutsAndPicker() {
-        // Profiles (cs-615265) and Permissions (cs-0fb394) appear once their content exists.
-        #expect(SettingsPane.visible(for: .mvp) == [.general, .shortcuts, .picker])
+    @Test func mvpShowsGeneralShortcutsPickerAndPermissions() {
+        // Profiles (cs-615265) appears once its content exists.
+        #expect(SettingsPane.visible(for: .mvp) == [.general, .shortcuts, .picker, .permissions])
     }
 
     @Test func v3AddsFormatsAndSync() {
-        #expect(SettingsPane.visible(for: .v3) == [.general, .shortcuts, .picker, .formats, .sync])
+        #expect(SettingsPane.visible(for: .v3) == [.general, .shortcuts, .picker, .permissions, .formats, .sync])
     }
 }

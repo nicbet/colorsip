@@ -197,4 +197,10 @@ public struct LocalSettings {
         get { defaults.string(forKey: "settingsPane").flatMap(SettingsPane.init(rawValue:)) ?? .general }
         nonmutating set { defaults.set(newValue.rawValue, forKey: "settingsPane") }
     }
+
+    /// Permissions the user skipped in the onboarding guide; the launch check leaves them out.
+    public var skippedPermissions: Set<Permission> {
+        get { Set((defaults.stringArray(forKey: "skippedPermissions") ?? []).compactMap(Permission.init(rawValue:))) }
+        nonmutating set { defaults.set(newValue.map(\.rawValue).sorted(), forKey: "skippedPermissions") }
+    }
 }

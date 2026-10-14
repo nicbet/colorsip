@@ -21,8 +21,41 @@ struct SettingsTab: View {
         case .general: GeneralPane(model: model)
         case .shortcuts: ShortcutsPane(shortcuts: model.shortcuts)
         case .picker: PickerPane(settings: model.settings)
-        case .profiles, .permissions, .formats, .sync: EmptyView() // cs-615265, cs-0fb394, V3
+        case .permissions: PermissionsPane(model: model)
+        case .profiles, .formats, .sync: EmptyView() // cs-615265, V3
         }
+    }
+}
+
+private struct PermissionsPane: View {
+    let model: AppModel
+
+    private var permissions: Permissions { model.permissions }
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(Permission.allCases, id: \.self) { permission in
+                    LabeledContent {
+                        let granted = permissions.isGranted(permission)
+                        Label(granted ? "Granted" : "Not granted",
+                              systemImage: granted ? "checkmark.circle.fill" : "xmark.circle")
+                            .foregroundStyle(granted ? .green : .secondary)
+                    } label: {
+                        Text(permission.title)
+                        Text(permission.explanation)
+                    }
+                }
+            }
+            if !permissions.missing.isEmpty {
+                Section {
+                    Button("Start Guide Again") { model.startPermissionsGuide() }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        // The app refreshes when it becomes active; this covers switching panes.
+        .onAppear { permissions.refresh() }
     }
 }
 

@@ -18,14 +18,24 @@ struct ColorsipApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let model = AppModel(loginItemService: SMAppServiceLoginItem(), hotKeyRegistrar: CarbonHotKeyRegistrar())
+    private let systemPermissions = SystemPermissionChecker()
+    private lazy var model = AppModel(
+        loginItemService: SMAppServiceLoginItem(),
+        hotKeyRegistrar: CarbonHotKeyRegistrar(),
+        permissionChecker: systemPermissions
+    )
     private var mainWindow: MainWindowController?
     private var statusItem: StatusItemController?
+    private var permissionsGuide: PermissionsCoordinator?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let mainWindow = MainWindowController(model: model)
         self.mainWindow = mainWindow
+        let permissionsGuide = PermissionsCoordinator(permissions: model.permissions, system: systemPermissions)
+        self.permissionsGuide = permissionsGuide
+        model.startPermissionsGuide = { permissionsGuide.startGuide() }
         let picker: @MainActor () -> Void = {
+            guard permissionsGuide.require(.screenRecording) else { return }
             // cs-40b6c9 opens the picker here.
             Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "picker").info("Picker requested")
         }
@@ -41,5 +51,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings: { mainWindow.show(.settings) },
             quit: { NSApp.terminate(nil) }
         ))
+        permissionsGuide.checkAtLaunch()
     }
 }

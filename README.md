@@ -36,8 +36,10 @@ Colorsip is an agent app: it has no Dock icon. Look for it in the menubar.
 
 ## Grant permissions
 
-Colorsip needs two macOS permissions. It asks for them the first time you use a feature that needs
-them, and you can grant them later in **System Settings → Privacy & Security**.
+Colorsip needs two macOS permissions. At launch, and when you use a feature that needs one, a
+guide walks you through the missing ones: it opens the right pane of **System Settings → Privacy &
+Security** and moves on once you've turned Colorsip on. Accessibility is optional and can be
+skipped. **Settings ▸ Permissions** shows what's granted and starts the guide again.
 
 | Permission | Needed for |
 |---|---|
@@ -47,7 +49,8 @@ them, and you can grant them later in **System Settings → Privacy & Security**
 The global picker shortcut, **⌃⌥⌘P** by default, needs no permission. You can change it in
 Settings ▸ Shortcuts.
 
-After you grant Screen Recording, quit and reopen Colorsip.
+If the guide doesn't move on after you grant Screen Recording, click **Quit & Reopen**: macOS
+sometimes only reports the permission after a restart.
 
 Because the app is signed locally, macOS ties these permissions to that build's signature. If a
 rebuild stops working with a permission you already granted, remove Colorsip from the list in
