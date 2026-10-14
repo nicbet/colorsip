@@ -52,9 +52,32 @@ Settings ▸ Shortcuts.
 If the guide doesn't move on after you grant Screen Recording, click **Quit & Reopen**: macOS
 sometimes only reports the permission after a restart.
 
-Because the app is signed locally, macOS ties these permissions to that build's signature. If a
-rebuild stops working with a permission you already granted, remove Colorsip from the list in
-System Settings and grant it again.
+### Keep permissions across rebuilds
+
+By default the app is signed ad hoc, and macOS ties these permissions to that one build. After a
+rebuild, Colorsip still shows as allowed in System Settings, but the permission no longer applies
+and the guide comes back.
+
+To fix that, create a local code-signing certificate once:
+
+```sh
+make signing-cert
+```
+
+This creates a self-signed certificate named "Colorsip Local Signing" in your login keychain,
+trusts it for code signing only (macOS asks for your password), and writes the untracked
+`Config/Signing.local.xcconfig` so Xcode signs with it too. `make build` uses it whenever it is in
+your keychain. On the first signed build, macOS asks whether `codesign` may use the key: click
+**Always Allow**.
+
+Then clear the old grants and grant the permissions once more:
+
+```sh
+make reset-permissions
+```
+
+Without the certificate, run `make reset-permissions` (or remove Colorsip from the list in System
+Settings) after a rebuild, then grant again.
 
 ## Development
 

@@ -1,0 +1,9 @@
+// Ad-hoc signing by default. `make signing-cert` writes Signing.local.xcconfig (untracked) to sign
+// with a stable self-signed identity instead, so macOS privacy grants survive rebuilds.
+// `make build` sets COLORSIP_SIGNING_IDENTITY rather than CODE_SIGN_IDENTITY: command-line settings
+// apply to every target, and the ColorsipCore resource bundle can't be signed with this identity.
+COLORSIP_SIGNING_IDENTITY = -
+
+#include? "Signing.local.xcconfig"
+
+CODE_SIGN_IDENTITY = $(COLORSIP_SIGNING_IDENTITY)
