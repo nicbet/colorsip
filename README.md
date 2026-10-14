@@ -96,6 +96,10 @@ swift test
 
 CI (GitHub Actions) runs the Core tests and builds the app on every push and pull request.
 
+The picker draws on screen and can't be fully tested automatically. To check it by hand, open
+`TestPages/picker-swatches.html` in Safari. It has sRGB and Display P3 swatches labelled with
+the values the picker should show, and 1-pixel patterns for checking the loupe grid and arrow keys.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).

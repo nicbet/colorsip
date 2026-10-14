@@ -96,7 +96,10 @@ A three-pane window, opened from the popover's bottom bar or a user-assigned glo
 ### 4.2 Overlay and loupe
 - A borderless, transparent overlay window covers every display. It follows the pointer across
   displays, including displays with different scale factors and color profiles.
-- Pixels come from ScreenCaptureKit, in the native color space of the display under the pointer.
+- Pixels come from ScreenCaptureKit, composited in **extended linear Display P3, as half floats**,
+  not in the display's native profile. A display's calibrated profile can clip colors (on some
+  panels even sRGB blue and yellow), and 8 bits per channel can't round-trip 8-bit sRGB values
+  through a wider space. Linear half floats keep both sRGB and P3 content exact.
 - The **loupe** is a circle that shows a magnified pixel grid, with the center pixel outlined.
 - Under the loupe, a **label** shows the value in the active format and the color's friendly name
   (§5.5).
@@ -202,7 +205,7 @@ reduction.
 ## 6. Color profiles and Smart Profiles — MVP
 "Color profiles" and "Smart Profiles" are the same feature.
 
-- The picker samples in the display's native space and **converts the value to a target profile**
+- The picker samples in extended Display P3 (§4.2) and **converts the value to a target profile**
   chosen for the app under the pointer: the app that owns the window under the cursor, not the
   frontmost app.
 - **Smart Profiles** look up the target profile by app bundle ID. Built-in defaults, which users can
@@ -215,7 +218,8 @@ reduction.
 | Everything else | Fallback setting (default: sRGB) |
 
 - In Settings, users can add, edit and remove app → profile rows. The fallback can be "Display
-  native" (no conversion), sRGB, Display P3 or Generic RGB.
+  P3" (no conversion), sRGB or Generic RGB. There is no "Display native" option: samples are
+  never in the display's own profile (§4.2).
 - The loupe label shows the profile it used (e.g. a small "sRGB" or "P3" badge).
 
 ## 7. Palettes — MVP

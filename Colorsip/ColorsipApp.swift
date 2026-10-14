@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: MainWindowController?
     private var statusItem: StatusItemController?
     private var permissionsGuide: PermissionsCoordinator?
+    private var pickerController: PickerController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let libraryLog = Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "library")
@@ -38,10 +39,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let permissionsGuide = PermissionsCoordinator(permissions: model.permissions, system: systemPermissions)
         self.permissionsGuide = permissionsGuide
         model.startPermissionsGuide = { permissionsGuide.startGuide() }
+        let pickerController = PickerController(model: model)
+        self.pickerController = pickerController
+        // Until pick routing (cs-995046), a pick only copies its value.
+        pickerController.onPick = { [model] color in model.copy(color) }
         let picker: @MainActor () -> Void = {
             guard permissionsGuide.require(.screenRecording) else { return }
-            // cs-40b6c9 opens the picker here.
-            Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "picker").info("Picker requested")
+            pickerController.open()
         }
         model.shortcuts.onTrigger = { action in
             switch action {

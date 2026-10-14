@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colorsip picker test swatches</title>
+<style>
+  :root { color-scheme: light dark; font: 13px -apple-system, system-ui, sans-serif; }
+  body { margin: 24px; max-width: 1100px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; }
+  p, li { line-height: 1.45; }
+  code { font: 12px ui-monospace, Menlo, monospace; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .swatch { border: 1px solid #8884; border-radius: 8px; overflow: hidden; }
+  .chip { height: 90px; }
+  .info { padding: 6px 8px; }
+  .info div { font: 11px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+  .info .name { font: 12px -apple-system, system-ui, sans-serif; font-weight: 600; }
+  .out { color: #c50; }
+  canvas { border: 1px solid #8884; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<h1>Colorsip picker test swatches</h1>
+<p>Open this page in Safari, which color-manages CSS colors, and pick each swatch's center. Compare what
+the loupe label shows with the expected value under the swatch.</p>
+<ul>
+  <li><b>sRGB swatches</b>: set the format to <b>CSS Hex</b>. Expect exactly the same hex, including <code>#0000ff</code> and <code>#ffff00</code>.</li>
+  <li><b>Display P3 swatches</b>: set the format to <b>CSS Display P3</b>. On a P3 display expect the same
+    values within ±0.004 per channel. Swatches marked <span class="out">outside sRGB</span> also list the
+    gamut-mapped CSS Hex. On an sRGB display, out-of-sRGB swatches can't be shown as written.</li>
+  <li>The friendly name is the nearest entry of the bundled color name list.</li>
+  <li><b>Pixel patterns</b>: each stripe and checker square is one physical pixel. The loupe grid should
+    show them as alternating cells, and each arrow key press should step exactly one cell.</li>
+</ul>
+<p>Expected values come from ColorsipCore's own formatters.</p>
+
+<h2>sRGB (CSS Hex)</h2>
+<div class="grid" id="srgb"></div>
+
+<h2>Display P3 (CSS Display P3)</h2>
+<div class="grid" id="p3"></div>
+
+<h2>Pixel patterns</h2>
+<p>Device pixel ratio: <code id="dpr"></code>. Left: 1-pixel vertical stripes. Middle: 1-pixel horizontal
+stripes. Right: 1-pixel checkerboard with a single red pixel in its center.</p>
+<canvas id="pixels"></canvas>
+
+<script>
+const srgb = [
+  ["#ff0000", "Red", "color(display-p3 0.917 0.2 0.139)"],
+  ["#00ff00", "Green", "color(display-p3 0.458 0.985 0.298)"],
+  ["#0000ff", "Blue", "color(display-p3 0 0 0.96)"],
+  ["#00ffff", "Cyan", "color(display-p3 0.458 0.985 0.992)"],
+  ["#ff00ff", "Magenta", "color(display-p3 0.917 0.2 0.967)"],
+  ["#ffff00", "Yellow", "color(display-p3 1 1 0.331)"],
+  ["#000000", "Black", "color(display-p3 0 0 0)"],
+  ["#808080", "Grey", "color(display-p3 0.502 0.502 0.502)"],
+  ["#ffffff", "White", "color(display-p3 1 1 1)"],
+  ["#3c3cdb", "Palatinate Blue", "color(display-p3 0.235 0.235 0.826)"],
+  ["#e07a5f", "Flamenco Pink", "color(display-p3 0.825 0.499 0.397)"],
+  ["#2a9d8f", "Temple Guard Blue", "color(display-p3 0.311 0.607 0.561)"],
+];
+const p3 = [
+  ["color(display-p3 0.236 0.235 0.859)", "Royal Vessel", "#3c3ce4", false],
+  ["color(display-p3 0.4 0.6 0.3)", "Enviable", "#559b41", false],
+  ["color(display-p3 0.8 0.5 0.2)", "Orange Pepper", "#d97b15", false],
+  ["color(display-p3 0.9 0.2 0.6)", "Neon Pink", "#fa059c", false],
+  ["color(display-p3 1 0 0)", "Red", "#ff0b0c", true],
+  ["color(display-p3 0 1 0)", "Green", "#00fb29", true],
+  ["color(display-p3 0 0 1)", "Icelandic Water", "#0000ff", true],
+  ["color(display-p3 0 0.8 0.7)", "Mint Leaf", "#00cbb1", true],
+  ["color(display-p3 1 0.5 0)", "Shade of Amber", "#ff7d00", true],
+];
+
+function swatch(css, lines) {
+  const el = document.createElement("div");
+  el.className = "swatch";
+  el.innerHTML = `<div class="chip"></div><div class="info">${lines.join("")}</div>`;
+  el.firstChild.style.background = css;
+  return el;
+}
+
+for (const [hex, name, p3value] of srgb) {
+  document.getElementById("srgb").append(swatch(hex, [
+    `<div class="name">${name}</div>`,
+    `<div>${hex}</div>`,
+    `<div>${p3value}</div>`,
+  ]));
+}
+for (const [value, name, hex, outside] of p3) {
+  document.getElementById("p3").append(swatch(value, [
+    `<div class="name">${name}${outside ? ' <span class="out">outside sRGB</span>' : ""}</div>`,
+    `<div>${value}</div>`,
+    `<div>${hex}</div>`,
+  ]));
+}
+
+// Patterns drawn in physical pixels.
+const dpr = window.devicePixelRatio || 1;
+document.getElementById("dpr").textContent = dpr;
+const canvas = document.getElementById("pixels");
+const cssWidth = 360, cssHeight = 120;
+canvas.style.width = cssWidth + "px";
+canvas.style.height = cssHeight + "px";
+canvas.width = Math.round(cssWidth * dpr);
+canvas.height = Math.round(cssHeight * dpr);
+const ctx = canvas.getContext("2d");
+const third = Math.floor(canvas.width / 3);
+const image = ctx.createImageData(canvas.width, canvas.height);
+for (let y = 0; y < canvas.height; y++) {
+  for (let x = 0; x < canvas.width; x++) {
+    const on = x < third ? x % 2 === 0 : x < third * 2 ? y % 2 === 0 : (x + y) % 2 === 0;
+    const i = (y * canvas.width + x) * 4;
+    const v = on ? 0 : 255;
+    image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+    image.data[i + 3] = 255;
+  }
+}
+const cx = third * 2 + Math.floor(third / 2), cy = Math.floor(canvas.height / 2);
+const c = (cy * canvas.width + cx) * 4;
+image.data[c] = 255; image.data[c + 1] = 0; image.data[c + 2] = 0;
+ctx.putImageData(image, 0, 0);
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+import AppKit
+import ColorsipCore
+
+/// The picker (`spec.md` §4.1–4.3): overlays every screen, follows the pointer with the loupe and
+/// reports the outcome. A thin layer over `PickerSession`.
+@MainActor
+final class PickerController {
+    /// Called once the picker has closed with a picked color.
+    var onPick: @MainActor (CSipColor) -> Void = { _ in }
+
+    private let model: AppModel
+    private var session: PickerSession?
+    private var panels: [PickerOverlayPanel] = []
+    private var monitor: Any?
+    private var screenObserver: (any NSObjectProtocol)?
+    private lazy var sampler = ScreenSampler(
+        onFrame: { [weak self] in self?.resample() },
+        onError: { [weak self] _ in self?.close(.cancel) })
+
+    init(model: AppModel) {
+        self.model = model
+    }
+
+    var isOpen: Bool { session != nil }
+
+    func open() {
+        guard session == nil else { return }
+        let screens = NSScreen.screens.compactMap { screen in screen.displayID.map { (screen, $0) } }
+        guard !screens.isEmpty else { return }
+        let displays = screens.map { screen, id in
+            PickerDisplay(id: id, frame: screen.frame, scale: screen.backingScaleFactor)
+        }
+        session = PickerSession(displays: displays, loupe: model.settings.settings.loupe, point: NSEvent.mouseLocation)
+        panels = screens.map { screen, id in PickerOverlayPanel(screen: screen, displayID: id, content: LoupeView()) }
+
+        NSApp.activate()
+        panels.forEach { $0.orderFrontRegardless() }
+        panels.first { $0.displayID == session?.display.id }?.makeKey()
+        NSCursor.hide()
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown, .rightMouseDown, .scrollWheel, .keyDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            return handle(event) ? nil : event
+        }
+        // A display added, removed or rearranged invalidates every frame and panel.
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close(.cancel) }
+        }
+        displayChanged()
+    }
+
+    // MARK: Events
+
+    /// Returns whether the event was handled, so it doesn't reach other windows.
+    private func handle(_ event: NSEvent) -> Bool {
+        guard let session else { return false }
+        switch event.type {
+        case .mouseMoved, .leftMouseDragged, .rightMouseDragged:
+            moved(to: NSEvent.mouseLocation)
+        case .leftMouseDown:
+            close(.pick)
+        case .rightMouseDown:
+            break
+        case .scrollWheel:
+            // Momentum after a trackpad swipe would keep resizing the loupe.
+            guard event.momentumPhase.isEmpty else { return true }
+            session.scroll(
+                deltaY: event.scrollingDeltaY, isPrecise: event.hasPreciseScrollingDeltas,
+                isInverted: event.isDirectionInvertedFromDevice, option: event.modifierFlags.contains(.option))
+            resample()
+        case .keyDown:
+            return key(event, session: session)
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func key(_ event: NSEvent, session: PickerSession) -> Bool {
+        let shift = event.modifierFlags.contains(.shift)
+        let direction: ArrowDirection
+        switch Int(event.keyCode) {
+        case 53: close(.cancel); return true  // Esc
+        case 36, 76, 49: close(.pick); return true  // Return, keypad Enter, Space
+        case 123: direction = .left
+        case 124: direction = .right
+        case 125: direction = .down
+        case 126: direction = .up
+        default: return true  // Swallow other keys while picking.
+        }
+        warp(to: session.arrow(direction, shift: shift))
+        resample()
+        return true
+    }
+
+    private func moved(to point: CGPoint) {
+        guard let session else { return }
+        let display = session.display
+        session.pointerMoved(to: point)
+        if session.display != display {
+            displayChanged()
+        } else {
+            resample()
+        }
+    }
+
+    /// Moves the real pointer, which `CGWarpMouseCursorPosition` takes in top-left-origin
+    /// coordinates.
+    private func warp(to point: CGPoint) {
+        guard let primary = NSScreen.screens.first else { return }
+        CGWarpMouseCursorPosition(CGPoint(x: point.x, y: primary.frame.maxY - point.y))
+        // Without this, the pointer ignores the mouse for a moment after a warp.
+        CGAssociateMouseAndMouseCursorPosition(1)
+    }
+
+    // MARK: Sampling and drawing
+
+    private func displayChanged() {
+        guard let session else { return }
+        let id = session.display.id
+        sampler.capture(id)
+        panels.first { $0.displayID == id }?.makeKey()
+        resample()
+    }
+
+    /// Reads the grid from the latest frame and redraws.
+    private func resample() {
+        guard let session else { return }
+        if let frame = sampler.frame {
+            let sample = frame.sample(session.grid)
+            session.sampled(sample.samples, center: sample.center)
+        }
+        let content = LoupeView.Content(
+            point: session.point,
+            diameter: Double(session.loupe.diameter),
+            gridSize: session.loupe.gridSize,
+            samples: session.samples,
+            colorSpace: sampler.frame?.colorSpace,
+            label: session.label(format: model.outputFormat))
+        for panel in panels {
+            (panel.contentView as? LoupeView)?.content = panel.displayID == session.display.id ? content : nil
+        }
+    }
+
+    // MARK: Closing
+
+    private func close(_ action: PickerAction) {
+        guard let session, let outcome = session.finish(action) else { return }
+        self.session = nil
+        sampler.stop()
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        screenObserver = nil
+        panels.forEach { $0.orderOut(nil) }
+        panels = []
+        NSCursor.unhide()
+        // Saved once per session, not on every wheel notch.
+        model.settings.update { $0.loupe = session.loupe }
+        if case .picked(let color) = outcome { onPick(color) }
+    }
+}
+
+extension NSScreen {
+    /// The `CGDirectDisplayID`.
+    var displayID: UInt32? {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+}
