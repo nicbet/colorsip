@@ -6,6 +6,7 @@ SWIFT ?= swift
 PROJECT := Colorsip.xcodeproj
 SCHEME := Colorsip
 CONFIGURATION ?= Release
+BUNDLE_ID := com.nicolas-bettenburg.colorsip
 VERBOSE ?= 0
 CORE_PACKAGE_DIR := Packages/ColorsipCore
 BUILD_DIR := Builds
@@ -18,16 +19,17 @@ else
 XCODEBUILD_FLAGS := -quiet
 endif
 
-.PHONY: help build test clean
+.PHONY: help build test clean reset-permissions
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
-		'  help   Show this help message' \
-		'  build  Build the Colorsip app in Release configuration into $(BUILD_DIR)/' \
-		'         (VERBOSE=1 for full xcodebuild output)' \
-		'  test   Run the ColorsipCore test suite' \
-		'  clean  Remove $(BUILD_DIR)/'
+		'  help               Show this help message' \
+		'  build              Build the Colorsip app in Release configuration into $(BUILD_DIR)/' \
+		'                     (VERBOSE=1 for full xcodebuild output)' \
+		'  test               Run the ColorsipCore test suite' \
+		'  clean              Remove $(BUILD_DIR)/' \
+		'  reset-permissions  Reset Screen Recording and Accessibility grants'
 
 build:
 	@echo 'Building $(SCHEME) ($(CONFIGURATION))...'
@@ -41,3 +43,7 @@ test:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+reset-permissions:
+	tccutil reset ScreenCapture $(BUNDLE_ID)
+	tccutil reset Accessibility $(BUNDLE_ID)
