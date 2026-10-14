@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nicbet/colorsip/schema/colorsip-palette.schema.json",
+  "title": "Colorsip palette (.colorsip)",
+  "description": "A Colorsip palette: a W3C Design Tokens (DTCG) file whose top-level tokens are the ungrouped swatches and whose top-level groups are the palette's groups. Colorsip metadata sits under $extensions[\"app.colorsip\"].",
+  "type": "object",
+  "required": ["$extensions"],
+  "properties": {
+    "$description": { "type": "string" },
+    "$extensions": {
+      "type": "object",
+      "required": ["app.colorsip"],
+      "properties": { "app.colorsip": { "$ref": "#/$defs/paletteMeta" } }
+    }
+  },
+  "patternProperties": {
+    "^[^${}.][^{}.]*$": { "oneOf": [{ "$ref": "#/$defs/token" }, { "$ref": "#/$defs/group" }] }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+    },
+    "timestamp": {
+      "description": "ISO 8601 in UTC, with optional fractional seconds.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "order": {
+      "description": "The token and group keys in display order. JSON object order isn't significant.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "paletteMeta": {
+      "type": "object",
+      "required": ["formatVersion", "id", "name", "locked", "createdAt", "modifiedAt", "order"],
+      "properties": {
+        "formatVersion": { "type": "integer", "minimum": 1 },
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string" },
+        "icon": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["emoji"],
+              "properties": { "emoji": { "type": "string" } },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["symbol"],
+              "properties": { "symbol": { "type": "string", "description": "An SF Symbol name." } },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "locked": { "type": "boolean" },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "modifiedAt": { "$ref": "#/$defs/timestamp" },
+        "order": { "$ref": "#/$defs/order" }
+      },
+      "additionalProperties": false
+    },
+    "group": {
+      "description": "A DTCG group of color tokens. Groups don't nest.",
+      "type": "object",
+      "required": ["$extensions"],
+      "properties": {
+        "$extensions": {
+          "type": "object",
+          "required": ["app.colorsip"],
+          "properties": {
+            "app.colorsip": {
+              "type": "object",
+              "required": ["id", "name", "order"],
+              "properties": {
+                "id": { "$ref": "#/$defs/uuid" },
+                "name": { "type": "string" },
+                "order": { "$ref": "#/$defs/order" }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "patternProperties": { "^[^${}.][^{}.]*$": { "$ref": "#/$defs/token" } },
+      "additionalProperties": false
+    },
+    "token": {
+      "description": "A DTCG color token: one swatch.",
+      "type": "object",
+      "required": ["$type", "$value", "$extensions"],
+      "properties": {
+        "$type": { "const": "color" },
+        "$value": { "$ref": "#/$defs/color" },
+        "$description": { "type": "string" },
+        "$extensions": {
+          "type": "object",
+          "required": ["app.colorsip"],
+          "properties": {
+            "app.colorsip": {
+              "type": "object",
+              "required": ["id", "name", "createdAt", "modifiedAt"],
+              "properties": {
+                "id": { "$ref": "#/$defs/uuid" },
+                "name": { "type": "string" },
+                "createdAt": { "$ref": "#/$defs/timestamp" },
+                "modifiedAt": { "$ref": "#/$defs/timestamp" }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "color": {
+      "description": "A DTCG color value. Components are not clamped; hex is an informative sRGB fallback.",
+      "type": "object",
+      "required": ["colorSpace", "components"],
+      "properties": {
+        "colorSpace": {
+          "enum": ["srgb", "display-p3", "generic-rgb", "oklab", "oklch", "hsl", "hwb"]
+        },
+        "components": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "alpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

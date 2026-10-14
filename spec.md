@@ -330,7 +330,7 @@ migration:
   - Groups become DTCG groups, and swatches become `$type: "color"` tokens.
   - Colorsip metadata (ids, icon, lock, timestamps, order, descriptions) sits under
     `$extensions["app.colorsip"]`.
-- It has a top-level `formatVersion` and is validated against a published **JSON Schema (2020-12)**
+- It has a `formatVersion` in `$extensions["app.colorsip"]` and is validated against a published **JSON Schema (2020-12)**
   stored at `schema/colorsip-palette.schema.json` in the repo.
 - Exported UTI `app.colorsip.palette`, extension `.colorsip`. Double-clicking a file imports it (V2).
 
