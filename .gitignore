@@ -2,3 +2,5 @@
 .xpo/git.lock
 .xpo/events.lock
 .xpo/worktrees/
+.xpo/chats/
+/design
