@@ -292,9 +292,10 @@ Picks can be undone too, except their effect on Color History.
 - At launch, and whenever a feature needs a permission, Colorsip checks for:
   - **Screen Recording**: required by the picker.
   - **Accessibility**: only needed for Cmd+click paste.
-- If any are missing, an onboarding window **walks through them one at a time**: what the
-  permission is for, a button that opens the right System Settings pane, and live detection that
-  moves on to the next step once the permission is granted.
+- If any are missing, an onboarding window shows them **as one checklist**. Each row says what the
+  permission is for, has a button that opens the right System Settings pane, and shows a ✓ as
+  soon as the permission is granted, without restarting Colorsip. A feature that needs a
+  permission opens the checklist with that row highlighted.
 - Accessibility can be skipped. Settings shows the status of each permission and lets the user
   start the guide again.
 

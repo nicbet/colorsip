@@ -8,9 +8,22 @@ import CoreGraphics
 final class SystemPermissionChecker: PermissionChecker {
     func isGranted(_ permission: Permission) -> Bool {
         switch permission {
-        case .screenRecording: CGPreflightScreenCaptureAccess()
+        // The preflight keeps its first answer until a restart; the probe sees a grant live.
+        case .screenRecording: CGPreflightScreenCaptureAccess() || screenRecordingProbe()
         case .accessibility: AXIsProcessTrusted()
         }
+    }
+
+    private func screenRecordingProbe() -> Bool {
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        let windows = (info as? [[String: Any]] ?? []).map { window in
+            WindowListEntry(
+                ownerPID: (window[kCGWindowOwnerPID as String] as? Int32) ?? 0,
+                name: window[kCGWindowName as String] as? String,
+                layer: (window[kCGWindowLayer as String] as? Int) ?? 0
+            )
+        }
+        return ScreenRecordingProbe.isGranted(windows: windows, ownPID: ProcessInfo.processInfo.processIdentifier)
     }
 
     /// Adds Colorsip to the permission's list in System Settings, so the user only has to turn it

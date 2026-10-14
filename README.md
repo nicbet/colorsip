@@ -49,8 +49,8 @@ skipped. **Settings ▸ Permissions** shows what's granted and starts the guide 
 The global picker shortcut, **⌃⌥⌘P** by default, needs no permission. You can change it in
 Settings ▸ Shortcuts.
 
-If the guide doesn't move on after you grant Screen Recording, click **Quit & Reopen**: macOS
-sometimes only reports the permission after a restart.
+Colorsip lists the missing permissions in one window and ticks each one off as soon as you turn
+it on in System Settings. No restart is needed.
 
 ### Keep permissions across rebuilds
 

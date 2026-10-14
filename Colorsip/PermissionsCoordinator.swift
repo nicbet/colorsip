@@ -3,8 +3,8 @@ import ColorsipCore
 import Observation
 import SwiftUI
 
-/// Shows the permissions onboarding guide (`spec.md` §9) in its own window while
-/// `Permissions.guide` is set, and keeps the status fresh.
+/// Shows the permissions checklist (`spec.md` §9) in its own window while
+/// `Permissions.checklist` is set, and keeps the status fresh.
 @MainActor
 final class PermissionsCoordinator: NSObject, NSWindowDelegate {
     private let permissions: Permissions
@@ -29,21 +29,21 @@ final class PermissionsCoordinator: NSObject, NSWindowDelegate {
         permissions.checkAtLaunch()
     }
 
-    /// Starts the guide on every missing permission (Settings ▸ Permissions).
+    /// Opens the checklist on every missing permission (Settings ▸ Permissions).
     func startGuide() {
         if permissions.startGuide() { bringWindowForward() }
     }
 
-    /// For a feature that needs `permission`: `true` if it's granted, otherwise opens the guide on
-    /// it and returns `false`.
+    /// For a feature that needs `permission`: `true` if it's granted, otherwise opens the checklist
+    /// with it highlighted and returns `false`.
     func require(_ permission: Permission) -> Bool {
         let granted = permissions.require(permission)
         if !granted { bringWindowForward() }
         return granted
     }
 
-    /// Brings an open guide window to the front. A window that isn't open yet appears once the
-    /// guide change is observed.
+    /// Brings an open checklist window to the front. A window that isn't open yet appears once the
+    /// checklist change is observed.
     private func bringWindowForward() {
         guard let window, window.isVisible else { return }
         NSApp.activate()
@@ -54,7 +54,7 @@ final class PermissionsCoordinator: NSObject, NSWindowDelegate {
 
     private func observeGuide() {
         withObservationTracking {
-            _ = permissions.guide != nil
+            _ = permissions.checklist != nil
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.syncWindow()
@@ -64,7 +64,7 @@ final class PermissionsCoordinator: NSObject, NSWindowDelegate {
     }
 
     private func syncWindow() {
-        if permissions.guide == nil {
+        if permissions.checklist == nil {
             window?.close()
         } else if window?.isVisible != true {
             showWindow()
@@ -78,8 +78,7 @@ final class PermissionsCoordinator: NSObject, NSWindowDelegate {
                     system.register(permission)
                     system.openSettings(for: permission)
                 },
-                skip: { [permissions] in permissions.skip() },
-                relaunch: relaunch,
+                skip: { [permissions] permission in permissions.skip(permission) },
                 done: { [permissions] in permissions.closeGuide() }
             ))
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
@@ -108,24 +107,5 @@ final class PermissionsCoordinator: NSObject, NSWindowDelegate {
         pollTimer = nil
         // Closing the window isn't skipping.
         permissions.closeGuide()
-    }
-
-    /// Quits and starts Colorsip again, for when macOS only reports Screen Recording after a
-    /// relaunch. The new instance starts once this one has exited, so the two never compete for
-    /// the status item or the global shortcuts.
-    private func relaunch() {
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = [
-            "-c", "while /bin/kill -0 \(pid) 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$0\"",
-            Bundle.main.bundleURL.path,
-        ]
-        do {
-            try process.run()
-            NSApp.terminate(nil)
-        } catch {
-            NSSound.beep()
-        }
     }
 }

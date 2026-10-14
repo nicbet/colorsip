@@ -3,74 +3,86 @@ import SwiftUI
 
 struct PermissionGuideActions {
     var openSettings: @MainActor (Permission) -> Void
-    var skip: @MainActor () -> Void
-    var relaunch: @MainActor () -> Void
+    var skip: @MainActor (Permission) -> Void
     var done: @MainActor () -> Void
 }
 
-/// The onboarding guide (`spec.md` §9): one missing permission at a time, then "all set".
+/// The onboarding checklist (`spec.md` §9): every listed permission at once with its live status,
+/// then "all set".
 struct PermissionGuideView: View {
     let permissions: Permissions
     let actions: PermissionGuideActions
 
     var body: some View {
         Group {
-            if let guide = permissions.guide {
-                switch guide.step {
-                case .permission(let permission): step(permission, guide: guide)
-                case .done: allSet
+            if let checklist = permissions.checklist {
+                if permissions.isComplete {
+                    allSet
+                } else {
+                    list(checklist)
                 }
             }
         }
         .padding(24)
-        .frame(width: 440)
+        .frame(width: 520)
     }
 
-    private func step(_ permission: Permission, guide: PermissionGuide) -> some View {
+    private func list(_ checklist: PermissionChecklist) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            if guide.total > 1 {
-                Text("Step \(guide.stepNumber) of \(guide.total)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            HStack(alignment: .top, spacing: 16) {
-                Image(systemName: permission.systemImage)
-                    .font(.system(size: 32))
-                    .foregroundStyle(.tint)
-                    .frame(width: 44)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(permission.title).font(.title2.bold())
-                    Text(permission.explanation)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Click Open System Settings, then turn on Colorsip in the list.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            Text("Colorsip needs your permission")
+                .font(.title2.bold())
+            Text("Click Open System Settings, then turn on Colorsip in the list. Each row updates as soon as macOS reports the change.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 8) {
+                ForEach(checklist.items, id: \.self) { permission in
+                    row(permission, highlighted: checklist.highlighted == permission)
                 }
-            }
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Waiting for permission…").foregroundStyle(.secondary)
-            }
-            if permission == .screenRecording {
-                Text("If Colorsip doesn't move on after you turn it on, macOS needs it to restart.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack {
-                if permission.isSkippable {
-                    Button("Skip") { actions.skip() }
-                }
-                if permission == .screenRecording {
-                    Button("Quit & Reopen") { actions.relaunch() }
-                }
-                Spacer()
-                Button("Open System Settings") { actions.openSettings(permission) }
-                    .keyboardShortcut(.defaultAction)
             }
         }
-        // A new step is a new view, so the focus moves to its default button.
-        .id(permission)
+    }
+
+    private func row(_ permission: Permission, highlighted: Bool) -> some View {
+        let status = permissions.status(of: permission)
+        return HStack(alignment: .top, spacing: 14) {
+            Image(systemName: permission.systemImage)
+                .font(.system(size: 26))
+                .foregroundStyle(.tint)
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(permission.title).font(.headline)
+                    if !permission.isSkippable && status != .granted {
+                        Text("Required").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text(permission.explanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if status != .granted {
+                    HStack {
+                        Button("Open System Settings") { actions.openSettings(permission) }
+                        if status == .skipped {
+                            Text("Skipped").foregroundStyle(.secondary)
+                        } else if permission.isSkippable {
+                            Button("Skip") { actions.skip(permission) }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            Spacer(minLength: 0)
+            if status == .granted {
+                Label("Granted", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(highlighted && status != .granted ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+        )
     }
 
     private var allSet: some View {

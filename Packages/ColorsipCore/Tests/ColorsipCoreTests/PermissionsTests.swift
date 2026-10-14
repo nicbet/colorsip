@@ -52,7 +52,7 @@ struct PermissionsTests {
         #expect(Permission.accessibility.isSkippable)
     }
 
-    @Test func missingIsInGuideOrder() {
+    @Test func missingIsInChecklistOrder() {
         #expect(permissions().0.missing == [.screenRecording, .accessibility])
         #expect(permissions(granted: [.screenRecording]).0.missing == [.accessibility])
         #expect(permissions(granted: Set(Permission.allCases)).0.missing.isEmpty)
@@ -69,34 +69,34 @@ struct PermissionsTests {
 
     // MARK: Launch
 
-    @Test func launchWithEverythingGrantedStartsNoGuide() {
+    @Test func launchWithEverythingGrantedOpensNoChecklist() {
         let (permissions, _) = permissions(granted: Set(Permission.allCases))
         permissions.checkAtLaunch()
-        #expect(permissions.guide == nil)
+        #expect(permissions.checklist == nil)
     }
 
-    @Test func launchWalksThroughEveryMissingPermission() throws {
+    @Test func launchListsEveryMissingPermissionAtOnce() throws {
         let (permissions, _) = permissions()
         permissions.checkAtLaunch()
-        let guide = try #require(permissions.guide)
-        #expect(guide.step == .permission(.screenRecording))
-        #expect(guide.stepNumber == 1)
-        #expect(guide.total == 2)
+        let checklist = try #require(permissions.checklist)
+        #expect(checklist.items == [.screenRecording, .accessibility])
+        #expect(checklist.highlighted == nil)
+        #expect(permissions.status(of: .screenRecording) == .missing)
+        #expect(permissions.status(of: .accessibility) == .missing)
     }
 
     @Test func launchLeavesOutASkippedPermission() {
         temp.localSettings.skippedPermissions = [.accessibility]
         let (permissions, _) = permissions(granted: [.screenRecording])
         permissions.checkAtLaunch()
-        #expect(permissions.guide == nil)
+        #expect(permissions.checklist == nil)
     }
 
     @Test func launchStillAsksForScreenRecordingWhenAccessibilityWasSkipped() throws {
         temp.localSettings.skippedPermissions = [.accessibility]
         let (permissions, _) = permissions()
         permissions.checkAtLaunch()
-        let guide = try #require(permissions.guide)
-        #expect(guide.pending == [.screenRecording])
+        #expect(try #require(permissions.checklist).items == [.screenRecording])
     }
 
     @Test func aGrantedPermissionIsNoLongerRememberedAsSkipped() {
@@ -107,40 +107,35 @@ struct PermissionsTests {
         #expect(temp.localSettings.skippedPermissions.isEmpty)
     }
 
-    // MARK: Walking through
+    // MARK: Granting
 
-    @Test func grantingTheCurrentStepMovesOn() throws {
+    @Test func anyRowCanBeGrantedFirst() throws {
         let (permissions, checker) = permissions()
         permissions.checkAtLaunch()
-        checker.granted = [.screenRecording]
+        checker.granted = [.accessibility]
         permissions.refresh()
-        let guide = try #require(permissions.guide)
-        #expect(guide.step == .permission(.accessibility))
-        #expect(guide.stepNumber == 2)
+        #expect(try #require(permissions.checklist).items == [.screenRecording, .accessibility])
+        #expect(permissions.status(of: .accessibility) == .granted)
+        #expect(permissions.status(of: .screenRecording) == .missing)
+        #expect(!permissions.isComplete)
     }
 
-    @Test func grantingTheLastStepEndsOnDone() throws {
+    @Test func grantingEveryRowCompletesTheChecklist() {
         let (permissions, checker) = permissions()
         permissions.checkAtLaunch()
         checker.granted = Set(Permission.allCases)
         permissions.refresh()
-        #expect(try #require(permissions.guide).step == .done)
-    }
-
-    @Test func refreshWithoutChangesStaysOnTheStep() throws {
-        let (permissions, _) = permissions()
-        permissions.checkAtLaunch()
-        permissions.refresh()
-        #expect(try #require(permissions.guide).step == .permission(.screenRecording))
+        #expect(permissions.checklist != nil)
+        #expect(permissions.isComplete)
     }
 
     @Test func refreshWithoutChangesDoesntNotifyObservers() {
-        // The guide window observes `guide`, and the guide polls every second.
+        // The checklist window observes `checklist` and the statuses, and polls every second.
         let (permissions, _) = permissions()
         permissions.checkAtLaunch()
         let changed = Mutex(false)
         withObservationTracking {
-            _ = permissions.guide
+            _ = permissions.checklist
             _ = permissions.isGranted(.screenRecording)
         } onChange: {
             changed.withLock { $0 = true }
@@ -149,56 +144,57 @@ struct PermissionsTests {
         #expect(!changed.withLock { $0 })
     }
 
-    @Test func aLaterStepGrantedEarlyIsDropped() throws {
-        let (permissions, checker) = permissions()
-        permissions.checkAtLaunch()
-        checker.granted = [.accessibility]
-        permissions.refresh()
-        let guide = try #require(permissions.guide)
-        #expect(guide.pending == [.screenRecording])
-        checker.granted = Set(Permission.allCases)
-        permissions.refresh()
-        #expect(try #require(permissions.guide).step == .done)
-    }
-
     // MARK: Skipping
 
-    @Test func screenRecordingCantBeSkipped() throws {
+    @Test func screenRecordingCantBeSkipped() {
         let (permissions, _) = permissions()
         permissions.checkAtLaunch()
-        permissions.skip()
-        #expect(try #require(permissions.guide).step == .permission(.screenRecording))
+        permissions.skip(.screenRecording)
+        #expect(permissions.status(of: .screenRecording) == .missing)
         #expect(temp.localSettings.skippedPermissions.isEmpty)
     }
 
-    @Test func skippingAccessibilityIsRemembered() {
-        let (permissions, _) = permissions(granted: [.screenRecording])
+    @Test func skippingAccessibilityIsRememberedAndShown() {
+        let (permissions, _) = permissions()
         permissions.checkAtLaunch()
-        permissions.skip()
+        permissions.skip(.accessibility)
         #expect(temp.localSettings.skippedPermissions == [.accessibility])
+        #expect(permissions.status(of: .accessibility) == .skipped)
+        #expect(!permissions.isComplete)
     }
 
-    @Test func skippingTheOnlyStepEndsTheGuide() {
+    @Test func skippingEverythingWithNothingGrantedEndsTheChecklist() {
         let (permissions, _) = permissions(granted: [.screenRecording])
         permissions.checkAtLaunch()
-        permissions.skip()
-        #expect(permissions.guide == nil)
+        permissions.skip(.accessibility)
+        #expect(permissions.checklist == nil)
     }
 
-    @Test func skippingAfterAGrantedStepEndsOnDone() throws {
+    @Test func skippingTheLastOpenRowAfterAGrantCompletes() {
         let (permissions, checker) = permissions()
         permissions.checkAtLaunch()
         checker.granted = [.screenRecording]
         permissions.refresh()
-        permissions.skip()
-        #expect(try #require(permissions.guide).step == .done)
+        permissions.skip(.accessibility)
+        #expect(permissions.checklist != nil)
+        #expect(permissions.isComplete)
+    }
+
+    @Test func aSkippedRowCanStillBeGranted() {
+        let (permissions, checker) = permissions()
+        permissions.checkAtLaunch()
+        permissions.skip(.accessibility)
+        checker.granted = [.accessibility]
+        permissions.refresh()
+        #expect(permissions.status(of: .accessibility) == .granted)
+        #expect(temp.localSettings.skippedPermissions.isEmpty)
     }
 
     @Test func closingIsNotSkipping() {
         let (permissions, _) = permissions(granted: [.screenRecording])
         permissions.checkAtLaunch()
         permissions.closeGuide()
-        #expect(permissions.guide == nil)
+        #expect(permissions.checklist == nil)
         #expect(temp.localSettings.skippedPermissions.isEmpty)
     }
 
@@ -208,19 +204,21 @@ struct PermissionsTests {
         temp.localSettings.skippedPermissions = [.accessibility]
         let (permissions, _) = permissions(granted: [.screenRecording])
         #expect(permissions.startGuide())
-        #expect(try #require(permissions.guide).pending == [.accessibility])
+        #expect(try #require(permissions.checklist).items == [.accessibility])
+        // The skip is still remembered, but the new checklist offers the row again.
+        #expect(permissions.status(of: .accessibility) == .missing)
     }
 
-    @Test func startingWithNothingMissingStartsNoGuide() {
+    @Test func startingWithNothingMissingOpensNoChecklist() {
         let (permissions, _) = permissions(granted: Set(Permission.allCases))
         #expect(!permissions.startGuide())
-        #expect(permissions.guide == nil)
+        #expect(permissions.checklist == nil)
     }
 
     @Test func requireAGrantedPermissionPasses() {
         let (permissions, _) = permissions(granted: [.screenRecording])
         #expect(permissions.require(.screenRecording))
-        #expect(permissions.guide == nil)
+        #expect(permissions.checklist == nil)
     }
 
     @Test func requireRechecksBeforeDeciding() {
@@ -229,12 +227,47 @@ struct PermissionsTests {
         #expect(permissions.require(.screenRecording))
     }
 
-    @Test func requireAMissingPermissionStartsTheGuideOnIt() throws {
+    @Test func requireAMissingPermissionHighlightsItsRow() throws {
         temp.localSettings.skippedPermissions = [.accessibility]
         let (permissions, _) = permissions()
         #expect(!permissions.require(.accessibility))
-        let guide = try #require(permissions.guide)
-        #expect(guide.pending == [.accessibility, .screenRecording])
-        #expect(guide.step == .permission(.accessibility))
+        let checklist = try #require(permissions.checklist)
+        #expect(checklist.items == [.screenRecording, .accessibility])
+        #expect(checklist.highlighted == .accessibility)
+    }
+}
+
+@Suite("Screen Recording probe")
+struct ScreenRecordingProbeTests {
+    private let ownPID: Int32 = 100
+
+    private func window(pid: Int32 = 200, name: String?, layer: Int = 0) -> WindowListEntry {
+        WindowListEntry(ownerPID: pid, name: name, layer: layer)
+    }
+
+    @Test func anotherAppsWindowTitleMeansGranted() {
+        let windows = [window(name: "Screen & System Audio Recording")]
+        #expect(ScreenRecordingProbe.isGranted(windows: windows, ownPID: ownPID))
+    }
+
+    @Test func noVisibleTitlesMeansNotGranted() {
+        // Without the permission, macOS leaves out other apps' window names.
+        let windows = [window(name: nil), window(pid: 300, name: nil)]
+        #expect(!ScreenRecordingProbe.isGranted(windows: windows, ownPID: ownPID))
+    }
+
+    @Test func ownWindowsDontCount() {
+        let windows = [window(pid: ownPID, name: "Colorsip Permissions")]
+        #expect(!ScreenRecordingProbe.isGranted(windows: windows, ownPID: ownPID))
+    }
+
+    @Test func emptyTitlesDontCount() {
+        #expect(!ScreenRecordingProbe.isGranted(windows: [window(name: "")], ownPID: ownPID))
+    }
+
+    @Test func onlyNormalWindowsCount() {
+        // The Dock, menu bar and status items are on other layers and may expose names anyway.
+        let windows = [window(name: "Dock", layer: 20), window(name: "Item-0", layer: 25)]
+        #expect(!ScreenRecordingProbe.isGranted(windows: windows, ownPID: ownPID))
     }
 }
