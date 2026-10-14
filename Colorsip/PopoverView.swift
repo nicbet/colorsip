@@ -25,9 +25,7 @@ struct PopoverView: View {
                 .padding(.bottom, 10)
 
             Divider()
-            // Palette list: cs-a29255.
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            PaletteListView(model: model)
             Divider()
 
             HStack {

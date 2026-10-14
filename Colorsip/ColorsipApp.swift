@@ -29,6 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionsGuide: PermissionsCoordinator?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let libraryLog = Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "library")
+        for issue in model.library.loadIssues {
+            libraryLog.error("Library load issue: \(String(describing: issue), privacy: .public)")
+        }
         let mainWindow = MainWindowController(model: model)
         self.mainWindow = mainWindow
         let permissionsGuide = PermissionsCoordinator(permissions: model.permissions, system: systemPermissions)
