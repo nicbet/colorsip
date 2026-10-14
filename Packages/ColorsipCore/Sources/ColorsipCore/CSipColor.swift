@@ -97,7 +97,7 @@ public struct CSipColor: Sendable, Hashable {
         return "#" + bytes.map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func byte(_ value: Double) -> Int {
+    static func byte(_ value: Double) -> Int {
         Int((min(max(value, 0), 1) * 255).rounded())
     }
 }

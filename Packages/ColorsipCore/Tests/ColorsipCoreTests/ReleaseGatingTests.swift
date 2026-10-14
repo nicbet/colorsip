@@ -44,10 +44,10 @@ struct ReleaseGatingTests {
 
 @Suite("Output format catalogue")
 struct OutputFormatCatalogueTests {
-    @Test func listsTheTenFormatsInSpecOrder() {
+    @Test func listsTheFormatsInSpecOrder() {
         #expect(OutputFormat.allCases.map(\.displayName) == [
             "CSS Hex", "CSS Hex (no #)", "CSS RGB", "CSS HSL", "CSS OKLCH", "CSS Display P3",
-            "SwiftUI", "NSColor", "UIColor", "Android",
+            "SwiftUI", "NSColor", "UIColor", "Android", "Android (XML)",
         ])
     }
 
