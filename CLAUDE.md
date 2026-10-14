@@ -1,0 +1,17 @@
+<!-- xpo:begin 1.4.0 sha256:e41789a7f757 -->
+## Exponential (xpo)
+
+This project uses `xpo` (Exponential) via the MCP server registered in `.mcp.json`.
+Always use the MCP tools — never shell out to the `xpo` CLI.
+
+Issue IDs in this project use the prefix `cs` (e.g. `cs-a1b2c3`).
+
+### Hard Rules
+
+1. Every code change must be backed by an xpo issue transitioned to DOING before any file is modified.
+2. Never start work on a BACKLOG issue without explicit user approval to transition it.
+3. Bugs discovered during implementation may be filed and fixed without approval — file the issue, link it to the current work, and fix it.
+4. Before beginning any implementation task, load the `xpo` skill and follow it.
+5. If an MCP tool call fails, report the error to the user. Never fall back to the CLI.
+
+<!-- xpo:end -->
