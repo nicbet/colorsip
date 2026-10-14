@@ -11,7 +11,7 @@ final class MainWindowController {
         window.title = "Colorsip"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 520, height: 360))
+        window.setContentSize(NSSize(width: 560, height: 420))
         window.center()
         return window
     }()
@@ -32,11 +32,20 @@ struct MainWindowView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        TabView(selection: $model.mainWindowTab) {
-            ForEach(MainWindowTab.visible(for: .current), id: \.self) { tab in
+        let tabs = MainWindowTab.visible(for: .current)
+        Group {
+            // A tab bar with a single tab (the MVP) would only add a second row of tabs above
+            // the Settings panes.
+            if tabs.count == 1, let tab = tabs.first {
                 content(tab)
-                    .tabItem { Text(tab.title) }
-                    .tag(tab)
+            } else {
+                TabView(selection: $model.mainWindowTab) {
+                    ForEach(tabs, id: \.self) { tab in
+                        content(tab)
+                            .tabItem { Text(tab.title) }
+                            .tag(tab)
+                    }
+                }
             }
         }
         .padding()
@@ -46,37 +55,8 @@ struct MainWindowView: View {
     @ViewBuilder private func content(_ tab: MainWindowTab) -> some View {
         switch tab {
         case .library: EmptyView() // V2
-        case .settings: SettingsTab(launchAtLogin: model.launchAtLogin)
+        case .settings: SettingsTab(model: model)
         }
-    }
-}
-
-/// Stub for the Settings tab; cs-7f6ead fills it out (`spec.md` §10).
-struct SettingsTab: View {
-    let launchAtLogin: LaunchAtLogin
-
-    var body: some View {
-        Form {
-            Section("General") {
-                Toggle("Launch at login", isOn: Binding(
-                    get: { launchAtLogin.isEnabled },
-                    set: { launchAtLogin.setEnabled($0) }
-                ))
-                if launchAtLogin.requiresApproval {
-                    Text("Allow Colorsip in System Settings → General → Login Items.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if let error = launchAtLogin.lastError {
-                    Text(error.localizedDescription)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        // Pick up changes made in System Settings while the window was closed.
-        .onAppear { launchAtLogin.refresh() }
     }
 }
 

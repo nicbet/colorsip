@@ -53,3 +53,29 @@ public enum MainWindowTab: Sendable, CaseIterable {
         allCases.filter { $0.release <= release }
     }
 }
+
+/// A pane of the Settings tab (`spec.md` §10).
+public enum SettingsPane: String, Sendable, CaseIterable {
+    case general, shortcuts, picker, profiles, permissions, formats, sync
+
+    public var release: Release {
+        switch self {
+        case .general, .shortcuts, .picker, .profiles, .permissions: .mvp
+        case .formats, .sync: .v3
+        }
+    }
+
+    /// Whether the pane has content yet. Profiles comes with cs-615265 and Permissions with
+    /// cs-0fb394; until then they're hidden rather than shown empty.
+    var hasContent: Bool {
+        switch self {
+        case .profiles, .permissions: false
+        default: true
+        }
+    }
+
+    /// The panes visible in `release`, in display order.
+    public static func visible(for release: Release) -> [SettingsPane] {
+        allCases.filter { $0.release <= release && $0.hasContent }
+    }
+}

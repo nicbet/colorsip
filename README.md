@@ -42,7 +42,10 @@ them, and you can grant them later in **System Settings → Privacy & Security**
 | Permission | Needed for |
 |---|---|
 | **Screen & System Audio Recording** | Reading pixel colors under the picker |
-| **Accessibility** | Global shortcuts and Cmd+click paste into the active app |
+| **Accessibility** | Cmd+click paste into the active app |
+
+The global picker shortcut, **⌃⌥⌘P** by default, needs no permission. You can change it in
+Settings ▸ Shortcuts.
 
 After you grant Screen Recording, quit and reopen Colorsip.
 

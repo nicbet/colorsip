@@ -1,7 +1,7 @@
 import Foundation
 
 /// An output format for copy, paste and the loupe label (`spec.md` §5.3), in display order.
-public enum OutputFormat: String, Sendable, CaseIterable, Identifiable {
+public enum OutputFormat: String, Sendable, CaseIterable, Identifiable, Codable {
     case cssHex, cssHexNoHash, cssRGB, cssHSL, cssOKLCH, cssDisplayP3
     case swiftUI, nsColor, uiColor, android, androidXML
 
