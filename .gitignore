@@ -12,8 +12,10 @@
 xcuserdata/
 DerivedData/
 build/
+/Builds/
 *.xcuserstate
 
 # Swift Package Manager
 .build/
+/Builds/
 .swiftpm/
