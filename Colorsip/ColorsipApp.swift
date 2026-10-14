@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let libraryLog = Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "library")
-        for issue in model.library.loadIssues {
+        for issue in model.library.loadIssues + [model.history.loadIssue].compactMap({ $0 }) {
             libraryLog.error("Library load issue: \(String(describing: issue), privacy: .public)")
         }
         let mainWindow = MainWindowController(model: model)
@@ -41,8 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.startPermissionsGuide = { permissionsGuide.startGuide() }
         let pickerController = PickerController(model: model)
         self.pickerController = pickerController
-        // Until pick routing (cs-995046), a pick only copies its value.
-        pickerController.onPick = { [model] color in model.copy(color) }
+        // Until pick routing (cs-995046), a pick only copies its value and goes into Color History.
+        pickerController.onPick = { [model] color in
+            model.recordPick(color)
+            model.copy(color)
+        }
         let picker: @MainActor () -> Void = {
             guard permissionsGuide.require(.screenRecording) else { return }
             pickerController.open()

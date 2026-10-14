@@ -10,6 +10,7 @@ final class AppModel {
     let shortcuts: ShortcutManager
     let permissions: Permissions
     let library: LibraryController
+    let history: ColorHistoryController
     @ObservationIgnored private let clipboard = SystemClipboard()
     /// Opens the permissions guide on every missing permission; set by `AppDelegate`.
     @ObservationIgnored var startPermissionsGuide: @MainActor () -> Void = {}
@@ -38,6 +39,7 @@ final class AppModel {
         shortcuts = ShortcutManager(settings: settings, registrar: hotKeyRegistrar)
         permissions = Permissions(checker: permissionChecker, localSettings: localSettings)
         library = LibraryController(store: libraryStore)
+        history = ColorHistoryController(store: libraryStore)
         self.localSettings = localSettings
         let pane = localSettings.settingsPane
         settingsPane = SettingsPane.visible(for: .current).contains(pane) ? pane : .general
@@ -46,6 +48,11 @@ final class AppModel {
     /// Copies `color` in `format`, or in the active format.
     func copy(_ color: CSipColor, as format: OutputFormat? = nil) {
         copyValue(of: color, as: format ?? outputFormat, to: clipboard)
+    }
+
+    /// Adds a pick to Color History under its friendly name.
+    func recordPick(_ color: CSipColor) {
+        history.record(color, name: color.friendlyName)
     }
 
     /// Makes `palette` the pick target. The radio button is only shown on unlocked palettes, so this

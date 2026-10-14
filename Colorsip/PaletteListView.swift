@@ -2,32 +2,62 @@ import AppKit
 import ColorsipCore
 import SwiftUI
 
-/// The popover's palette list (`spec.md` §3.1): one row per palette, in library order.
+/// The popover's palette list (`spec.md` §3.1): Color History first, then one row per palette, in
+/// library order.
 struct PaletteListView: View {
     let model: AppModel
 
     var body: some View {
         let library = model.library.library
-        if library.palettes.isEmpty {
-            Text("No palettes yet. Click + to create one.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollView(.vertical) {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    ForEach(library.palettes) { palette in
-                        PaletteRow(
-                            palette: palette,
-                            isPickTarget: library.pickTarget == palette.id,
-                            format: model.outputFormat,
-                            selectAsPickTarget: { model.setPickTarget(palette.id) },
-                            copy: { model.copy($0, as: $1) })
-                    }
+        ScrollView(.vertical) {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                HistoryRow(
+                    swatches: model.history.history.swatches,
+                    format: model.outputFormat,
+                    copy: { model.copy($0, as: $1) })
+                ForEach(library.palettes) { palette in
+                    PaletteRow(
+                        palette: palette,
+                        isPickTarget: library.pickTarget == palette.id,
+                        format: model.outputFormat,
+                        selectAsPickTarget: { model.setPickTarget(palette.id) },
+                        copy: { model.copy($0, as: $1) })
                 }
-                .padding(10)
+                if library.palettes.isEmpty {
+                    Text("No palettes yet. Click + to create one.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 20)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(10)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Color History (`spec.md` §7.4): read-only, so no radio button and no lock. A clock sits in their
+/// slot so the names line up.
+struct HistoryRow: View {
+    let swatches: [Swatch]
+    let format: OutputFormat
+    let copy: (CSipColor, OutputFormat) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text("Color History")
+            }
+            if swatches.isEmpty {
+                StripPlaceholder(label: "Picked colors appear here")
+            } else {
+                SwatchStrip(swatches: swatches, format: format, copy: copy)
+            }
         }
     }
 }
@@ -51,7 +81,7 @@ struct PaletteRow: View {
                     .truncationMode(.tail)
             }
             if palette.allSwatches.isEmpty {
-                DropColorsTarget()
+                StripPlaceholder(label: "Drop colors here")
             } else {
                 SwatchStrip(palette: palette, format: format, copy: copy)
             }
@@ -88,14 +118,17 @@ struct PaletteRow: View {
 private let stripHeight = 20.0
 private let stripCornerRadius = 4.0
 
-/// The dashed target an empty palette shows instead of a strip (`spec.md` §3.1).
-struct DropColorsTarget: View {
+/// The dashed box shown instead of an empty strip: an empty palette's "Drop colors here" target
+/// (`spec.md` §3.1), or an empty Color History.
+struct StripPlaceholder: View {
+    let label: String
+
     var body: some View {
         RoundedRectangle(cornerRadius: stripCornerRadius)
             .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             .foregroundStyle(.tertiary)
             .overlay {
-                Text("Drop colors here")
+                Text(label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -103,19 +136,33 @@ struct DropColorsTarget: View {
     }
 }
 
-/// A palette's swatches as fixed-width segments, one rounded run per section (`spec.md` §7.3). The
-/// geometry comes from ``SwatchStripLayout``.
+/// Swatches as fixed-width segments, one rounded run per section (`spec.md` §7.3). The geometry
+/// comes from ``SwatchStripLayout``.
 struct SwatchStrip: View {
-    let palette: Palette
+    private let makeLayout: (Double) -> SwatchStripLayout
     let format: OutputFormat
     let copy: (CSipColor, OutputFormat) -> Void
 
     @State private var offset = 0.0
     @State private var copied: Swatch.ID?
 
+    /// A palette's strip: its ungrouped section, then each group.
+    init(palette: Palette, format: OutputFormat, copy: @escaping (CSipColor, OutputFormat) -> Void) {
+        makeLayout = { SwatchStripLayout(palette: palette, width: $0) }
+        self.format = format
+        self.copy = copy
+    }
+
+    /// One section of `swatches`, such as Color History.
+    init(swatches: [Swatch], format: OutputFormat, copy: @escaping (CSipColor, OutputFormat) -> Void) {
+        makeLayout = { SwatchStripLayout(swatches: swatches, width: $0) }
+        self.format = format
+        self.copy = copy
+    }
+
     var body: some View {
         GeometryReader { proxy in
-            let layout = SwatchStripLayout(palette: palette, width: proxy.size.width)
+            let layout = makeLayout(proxy.size.width)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: SwatchStripLayout.groupGap) {
                     ForEach(layout.sections) { section in

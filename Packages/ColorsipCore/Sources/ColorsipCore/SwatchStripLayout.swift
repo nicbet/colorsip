@@ -41,9 +41,17 @@ public struct SwatchStripLayout: Sendable, Equatable {
     public let contentWidth: Double
 
     public init(palette: Palette, width: Double) {
+        self.init(runs: [(nil, palette.ungrouped)] + palette.groups.map { ($0.id, $0.swatches) }, width: width)
+    }
+
+    /// A strip of `swatches` as one section, such as Color History.
+    public init(swatches: [Swatch], width: Double) {
+        self.init(runs: [(nil, swatches)], width: width)
+    }
+
+    private init(runs: [(SwatchGroup.ID?, [Swatch])], width: Double) {
         let width = max(width, 0)
         let segmentWidth = width / Double(Self.swatchesAcross)
-        let runs: [(SwatchGroup.ID?, [Swatch])] = [(nil, palette.ungrouped)] + palette.groups.map { ($0.id, $0.swatches) }
         var sections: [Section] = []
         var x = 0.0
         for (group, swatches) in runs where !swatches.isEmpty {

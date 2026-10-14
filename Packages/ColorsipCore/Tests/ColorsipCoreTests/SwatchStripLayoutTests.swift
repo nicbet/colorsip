@@ -69,6 +69,15 @@ struct SwatchStripLayoutTests {
         #expect(!layout.isScrollable)
     }
 
+    @Test func swatchesWithoutAPaletteAreOneSection() {
+        let layout = SwatchStripLayout(swatches: swatches(3), width: 320)
+        #expect(layout.sections.count == 1)
+        #expect(layout.sections[0].group == nil)
+        #expect(layout.sections[0].swatches.count == 3)
+        #expect(layout.contentWidth == 60)
+        #expect(SwatchStripLayout(swatches: [], width: 320).isEmpty)
+    }
+
     @Test func moreThanSixteenSwatchesScroll() {
         let layout = SwatchStripLayout(palette: palette(ungrouped: 20), width: 320)
         #expect(layout.contentWidth == 400)
