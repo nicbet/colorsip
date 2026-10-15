@@ -7,6 +7,10 @@ import ColorsipCore
 final class PickerController {
     /// Called for every pick, as it is made; a multi session calls it several times.
     var onPick: @MainActor (CSipColor) -> Void = { _ in }
+    /// Called instead of `onPick` for a Cmd+click pick, after the picker closed, with the app that
+    /// was active before it opened.
+    var onPastePick: @MainActor (CSipColor, PasteTarget?) -> Void = { _, _ in }
+    private var pasteTarget: PasteTarget?
     /// Set while the color editor's eyedropper picks: it gets the first pick, or `nil` if the
     /// picker closes without one, instead of `onPick`.
     private var repick: (@MainActor (CSipColor?) -> Void)?
@@ -35,8 +39,10 @@ final class PickerController {
         if session == nil { finishRepick(nil) }
     }
 
-    func open() {
+    /// `pasteTarget`: the app a Cmd+click pick pastes into.
+    func open(pasteTarget: PasteTarget? = nil) {
         guard session == nil else { return }
+        self.pasteTarget = pasteTarget
         let screens = NSScreen.screens.compactMap { screen in screen.displayID.map { (screen, $0) } }
         guard !screens.isEmpty else { return }
         let displays = screens.map { screen, id in
@@ -107,7 +113,9 @@ final class PickerController {
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged:
             moved(to: NSEvent.mouseLocation)
         case .leftMouseDown:
-            perform(session.click(at: NSEvent.mouseLocation, shift: event.modifierFlags.contains(.shift)))
+            perform(session.click(
+                at: NSEvent.mouseLocation, shift: event.modifierFlags.contains(.shift),
+                command: event.modifierFlags.contains(.command)))
         case .flagsChanged:
             session.shiftChanged(isDown: event.modifierFlags.contains(.shift))
             optionChanged(isDown: event.modifierFlags.contains(.option), session: session)
@@ -163,10 +171,15 @@ final class PickerController {
 
     private func perform(_ step: PickerStep) {
         switch step {
-        case .pick(let color, _) where repick != nil:
+        case .pick(let color, _, _) where repick != nil:
             finishRepick(color)
             close()
-        case .pick(let color, let close):
+        case .pick(let color, _, paste: true):
+            // The overlay has to be gone before the target app is activated.
+            let target = pasteTarget
+            close()
+            onPastePick(color, target)
+        case .pick(let color, let close, paste: false):
             onPick(color)
             if close { self.close() } else { resample() }
         case .close:
@@ -240,6 +253,7 @@ final class PickerController {
         defer { finishRepick(nil) }
         guard let session else { return }
         self.session = nil
+        pasteTarget = nil
         sampler.stop()
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil

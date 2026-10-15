@@ -62,6 +62,20 @@ final class AppModel {
         routePick(color, format: outputFormat, history: history, library: library, clipboard: clipboard)
     }
 
+    /// Routes a Cmd+click pick and says whether it can be pasted into `target` (`spec.md` §4.5).
+    func didPastePick(_ color: CSipColor, into target: PasteTarget?) -> PastePlan {
+        permissions.refresh()
+        return routePastePick(
+            color, into: target, accessibilityGranted: permissions.isGranted(.accessibility),
+            formatForApp: format(forApp:), history: history, library: library, clipboard: clipboard)
+    }
+
+    /// The format for a value going to the app with `bundleID`. Smart Formats (`spec.md` §13, V3)
+    /// will look up the app's assigned format here; until then every app gets the active format.
+    func format(forApp bundleID: String?) -> OutputFormat {
+        outputFormat
+    }
+
     /// Creates a palette and opens its Rename popover.
     func newPalette() {
         edit = .renamePalette(library.newPalette())

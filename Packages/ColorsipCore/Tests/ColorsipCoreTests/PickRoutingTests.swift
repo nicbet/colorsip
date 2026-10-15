@@ -98,3 +98,74 @@ struct PickRoutingTests {
         #expect(history.history.swatches.count == 2)
     }
 }
+
+private let figma = PasteTarget(pid: 42, bundleID: "com.figma.Desktop")
+private let xcode = PasteTarget(pid: 43, bundleID: "com.apple.dt.Xcode")
+private let colorsip = PasteTarget(pid: 1, bundleID: "com.nicolas-bettenburg.colorsip")
+
+@MainActor
+@Suite("Cmd+click paste")
+struct PastePickTests {
+    @Test func theTargetIsTheFrontmostAppWhenItIsntColorsip() {
+        var tracker = PasteTargetTracker(ownBundleID: colorsip.bundleID)
+        tracker.activated(figma)
+        #expect(tracker.target(frontmost: xcode) == xcode)
+    }
+
+    @Test func whenColorsipIsFrontmostTheTargetIsTheLastOtherAppActivated() {
+        var tracker = PasteTargetTracker(ownBundleID: colorsip.bundleID)
+        tracker.activated(figma)
+        tracker.activated(xcode)
+        tracker.activated(colorsip)
+        #expect(tracker.target(frontmost: colorsip) == xcode)
+    }
+
+    @Test func noTargetBeforeAnyOtherAppWasActivated() {
+        var tracker = PasteTargetTracker(ownBundleID: colorsip.bundleID)
+        tracker.activated(colorsip)
+        #expect(tracker.target(frontmost: colorsip) == nil)
+        #expect(tracker.target(frontmost: nil) == nil)
+    }
+
+    @Test func pastesWithAccessibilityAndCopiesInTheTargetsFormat() throws {
+        let (library, history, temp, palette) = try routing()
+        defer { temp.cleanUp() }
+        let clipboard = FakeClipboard()
+        var askedFor: [String?] = []
+        let plan = routePastePick(
+            pickColor, into: figma, accessibilityGranted: true,
+            formatForApp: { askedFor.append($0); return .cssRGB },
+            history: history, library: library, clipboard: clipboard, at: t1)
+        #expect(plan == .paste(figma))
+        #expect(askedFor == ["com.figma.Desktop"])
+        #expect(clipboard.strings == ["rgb(60 60 219)"])
+        #expect(history.history.swatches.count == 1)
+        #expect(library.library.palette(palette)?.ungrouped.first?.name == pickColor.friendlyName)
+    }
+
+    @Test func withoutAccessibilityItOnlyCopiesAndAsksForThePermission() throws {
+        let (library, history, temp, _) = try routing()
+        defer { temp.cleanUp() }
+        let clipboard = FakeClipboard()
+        let plan = routePastePick(
+            pickColor, into: figma, accessibilityGranted: false, formatForApp: { _ in .cssHex },
+            history: history, library: library, clipboard: clipboard, at: t1)
+        #expect(plan == .needsAccessibility)
+        #expect(clipboard.strings == ["#3c3cdb"])
+        #expect(history.history.swatches.count == 1)
+    }
+
+    @Test func withoutATargetItOnlyCopiesWithoutAsking() throws {
+        let (library, history, temp, _) = try routing()
+        defer { temp.cleanUp() }
+        let clipboard = FakeClipboard()
+        var askedFor: [String?] = []
+        let plan = routePastePick(
+            pickColor, into: nil, accessibilityGranted: false,
+            formatForApp: { askedFor.append($0); return .cssHex },
+            history: history, library: library, clipboard: clipboard, at: t1)
+        #expect(plan == .copyOnly)
+        #expect(askedFor == [nil])
+        #expect(clipboard.strings == ["#3c3cdb"])
+    }
+}

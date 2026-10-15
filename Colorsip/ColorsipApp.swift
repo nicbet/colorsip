@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private var permissionsGuide: PermissionsCoordinator?
     private var pickerController: PickerController?
+    private var pasteTargets = PasteTargetTracker(ownBundleID: Bundle.main.bundleIdentifier)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let libraryLog = Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "library")
@@ -42,9 +43,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pickerController = PickerController(model: model)
         self.pickerController = pickerController
         pickerController.onPick = { [model] color in model.didPick(color) }
-        let picker: @MainActor () -> Void = {
+        pickerController.onPastePick = { [model] color, target in
+            switch model.didPastePick(color, into: target) {
+            case .paste(let target): SyntheticPaster.paste(into: target)
+            case .needsAccessibility: _ = permissionsGuide.require(.accessibility)
+            case .copyOnly: break
+            }
+        }
+        trackPasteTargets()
+        let picker: @MainActor () -> Void = { [weak self] in
             guard permissionsGuide.require(.screenRecording) else { return }
-            pickerController.open()
+            let frontmost = NSWorkspace.shared.frontmostApplication.map(PasteTarget.init)
+            pickerController.open(pasteTarget: self?.pasteTargets.target(frontmost: frontmost))
         }
         model.shortcuts.onTrigger = { action in
             switch action {
@@ -71,5 +81,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ))
         self.statusItem = statusItem
         permissionsGuide.checkAtLaunch()
+    }
+
+    /// Remembers the last app activated other than Colorsip, so a picker opened from the popover
+    /// pastes there (`spec.md` §4.5).
+    private func trackPasteTargets() {
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            pasteTargets.activated(PasteTarget(frontmost))
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            else { return }
+            let target = PasteTarget(app)
+            MainActor.assumeIsolated { self?.pasteTargets.activated(target) }
+        }
+    }
+}
+
+extension PasteTarget {
+    init(_ app: NSRunningApplication) {
+        self.init(pid: app.processIdentifier, bundleID: app.bundleIdentifier)
     }
 }

@@ -190,6 +190,20 @@ struct PickerModeTests {
         #expect(multi.click(at: start, shift: true) == .pick(red, close: false))
     }
 
+    @Test func commandClickPicksClosesAndPastesInEitherModeEvenWithShift() {
+        #expect(session().click(at: start, shift: false, command: true) == .pick(red, close: true, paste: true))
+        #expect(session().click(at: start, shift: true, command: true) == .pick(red, close: true, paste: true))
+        let multi = session()
+        multi.setMode(.multi)
+        #expect(multi.click(at: start, shift: false, command: true) == .pick(red, close: true, paste: true))
+    }
+
+    @Test func onlyCommandClickPastes() {
+        #expect(session().click(at: start, shift: false) == .pick(red, close: true, paste: false))
+        #expect(session().confirm() == .pick(red, close: true, paste: false))
+        #expect(session(sampled: false).click(at: start, shift: false, command: true) == PickerStep.none)
+    }
+
     @Test func escClosesInEitherModeEvenWithoutASample() {
         #expect(session(sampled: false).cancel() == .close)
         let multi = session()
@@ -326,6 +340,7 @@ struct PickerModeMenuTests {
         #expect(session.mode == .multi)
         #expect(session.click(at: CGPoint(x: 700, y: 300), shift: false) == PickerStep.none)
         #expect(session.mode == .multi)
+        #expect(session.click(at: CGPoint(x: 700, y: 300), shift: false, command: true) == PickerStep.none)
     }
 
     @Test func keysOtherThanEscDoNothingWhileTheMenuIsOpen() {

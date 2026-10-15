@@ -91,8 +91,9 @@ public enum PickerMode: Sendable {
 
 /// What the picker should do after an input.
 public enum PickerStep: Equatable, Sendable {
-    /// Route the color as a pick, then close the picker if `close`.
-    case pick(CSipColor, close: Bool)
+    /// Route the color as a pick, then close the picker if `close`. `paste`: paste it into the app
+    /// that was active before the picker opened (`spec.md` §4.5).
+    case pick(CSipColor, close: Bool, paste: Bool = false)
     case close
     case none
 }
@@ -293,13 +294,15 @@ public final class PickerSession {
 
     // MARK: Picking (`spec.md` §4.3–4.4)
 
-    /// A click at `location`. It picks; it closes in single mode unless Shift is down. While the mode
-    /// menu is open, a click on an item selects that mode instead, and other clicks do nothing.
-    public func click(at location: CGPoint, shift: Bool) -> PickerStep {
+    /// A click at `location`. It picks; it closes in single mode unless Shift is down. With Command,
+    /// in either mode and even with Shift, it picks, closes and pastes. While the mode menu is open,
+    /// a click on an item selects that mode instead, and other clicks do nothing.
+    public func click(at location: CGPoint, shift: Bool, command: Bool = false) -> PickerStep {
         if let menu = modeMenu {
             if let mode = menu.mode(at: location) { self.mode = mode }
             return .none
         }
+        if command { return pick(close: true, paste: true) }
         return pick(close: mode == .single && !shift)
     }
 
@@ -319,9 +322,9 @@ public final class PickerSession {
     }
 
     /// Picks the center color, or does nothing before the first sample.
-    private func pick(close: Bool) -> PickerStep {
+    private func pick(close: Bool, paste: Bool = false) -> PickerStep {
         guard let centerColor else { return .none }
         movedSincePick = false
-        return .pick(centerColor, close: close)
+        return .pick(centerColor, close: close, paste: paste)
     }
 }
