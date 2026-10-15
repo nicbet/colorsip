@@ -156,14 +156,220 @@ struct PickerSessionTests {
         #expect(session.label(format: .cssRGB)?.value == "rgb(0 0 0)")
     }
 
-    @Test func pickNeedsASample() {
-        let session = session()
-        #expect(session.finish(.pick) == nil)
-        session.sampled([], center: red)
-        #expect(session.finish(.pick) == .picked(red))
+}
+
+@MainActor
+@Suite("Picker modes")
+struct PickerModeTests {
+    private let start = CGPoint(x: 10.6, y: 980.9)
+    private let red = CSipColor(.displayP3, 1, 0, 0)
+    private let green = CSipColor(.displayP3, 0, 1, 0)
+
+    private func session(sampled: Bool = true) -> PickerSession {
+        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start)
+        if sampled { session.sampled([], center: red) }
+        return session
     }
 
-    @Test func cancelWorksWithoutASample() {
-        #expect(session().finish(.cancel) == .cancelled)
+    @Test func startsInSingleMode() {
+        #expect(session().mode == .single)
+        #expect(PickerMode.menu == [.single, .multi])
+    }
+
+    @Test func singleModeClickReturnAndSpacePickAndClose() {
+        #expect(session().click(at: start, shift: false) == .pick(red, close: true))
+        #expect(session().confirm() == .pick(red, close: true))
+    }
+
+    @Test func shiftClickPicksAndStaysInEitherMode() {
+        let single = session()
+        #expect(single.click(at: start, shift: true) == .pick(red, close: false))
+        #expect(single.click(at: start, shift: true) == .pick(red, close: false))
+        let multi = session()
+        multi.setMode(.multi)
+        #expect(multi.click(at: start, shift: true) == .pick(red, close: false))
+    }
+
+    @Test func escClosesInEitherModeEvenWithoutASample() {
+        #expect(session(sampled: false).cancel() == .close)
+        let multi = session()
+        multi.setMode(.multi)
+        _ = multi.click(at: start, shift: false)
+        #expect(multi.cancel() == .close)
+    }
+
+    @Test func pickingNeedsASample() {
+        let session = session(sampled: false)
+        #expect(session.click(at: start, shift: false) == PickerStep.none)
+        #expect(session.confirm() == PickerStep.none)
+        session.sampled([], center: red)
+        #expect(session.click(at: start, shift: false) == .pick(red, close: true))
+    }
+
+    @Test func labelShowsMultiInMultiModeOrWhileShiftIsHeld() {
+        let session = session()
+        #expect(session.label(format: .cssHex)?.isMulti == false)
+        session.shiftChanged(isDown: true)
+        #expect(session.label(format: .cssHex)?.isMulti == true)
+        session.shiftChanged(isDown: false)
+        #expect(session.label(format: .cssHex)?.isMulti == false)
+        session.setMode(.multi)
+        #expect(session.label(format: .cssHex)?.isMulti == true)
+    }
+
+    @Test func multiModeClicksPickAndStay() {
+        let session = session()
+        session.setMode(.multi)
+        #expect(session.click(at: start, shift: false) == .pick(red, close: false))
+        #expect(session.click(at: start, shift: false) == .pick(red, close: false))
+    }
+
+    @Test func multiModeReturnPicksAfterAMoveAndFinishesWithout() {
+        let session = session()
+        session.setMode(.multi)
+        // No pick yet: Return picks.
+        #expect(session.confirm() == .pick(red, close: false))
+        // Not moved since: Return finishes.
+        #expect(session.confirm() == .close)
+    }
+
+    @Test func multiModeMovesByPointerOrArrowCount() {
+        let session = session()
+        session.setMode(.multi)
+        _ = session.click(at: start, shift: false)
+        session.pointerMoved(to: CGPoint(x: 20, y: 970))
+        session.sampled([], center: green)
+        #expect(session.confirm() == .pick(green, close: false))
+        session.arrow(.left, shift: false)
+        #expect(session.confirm() == .pick(green, close: false))
+        #expect(session.confirm() == .close)
+    }
+
+    @Test func movingToTheSamePointOrBetweenDisplaysIsNotAMove() {
+        let session = session()
+        session.setMode(.multi)
+        _ = session.click(at: start, shift: false)
+        session.pointerMoved(to: start)
+        session.pointerMoved(to: CGPoint(x: 100, y: -50))
+        #expect(session.confirm() == .close)
+    }
+
+    @Test func multiModeReturnWithoutASampleAfterAMoveDoesNothing() {
+        let session = session()
+        session.setMode(.multi)
+        _ = session.click(at: start, shift: false)
+        session.pointerMoved(to: CGPoint(x: 1612.7, y: 971.8))  // Another display: no sample yet.
+        #expect(session.confirm() == PickerStep.none)
+    }
+}
+
+@MainActor
+@Suite("Picker mode menu")
+struct PickerModeMenuTests {
+    private let start = CGPoint(x: 10.6, y: 980.9)
+    private let red = CSipColor(.displayP3, 1, 0, 0)
+
+    private func session() -> PickerSession {
+        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start)
+        session.sampled([], center: red)
+        return session
+    }
+
+    @Test func layoutIsRightOfTheLoupeAndKeptOnTheDisplay() {
+        // Loupe: x -89.4…110.6, y 880.9…1080.9; the display ends at y 982.
+        let menu = PickerModeMenu(loupe: CGRect(x: -89.4, y: 880.9, width: 200, height: 200), bounds: builtIn.frame)
+        #expect(menu.frame == CGRect(x: 122.6, y: 926, width: 128, height: 56))
+        #expect(menu.items.map(\.mode) == [.single, .multi])
+        #expect(menu.items[0].frame == CGRect(x: 126.6, y: 954, width: 120, height: 24))
+        #expect(menu.items[1].frame == CGRect(x: 126.6, y: 930, width: 120, height: 24))
+    }
+
+    @Test func layoutGoesLeftWhenTheRightDoesNotFit() {
+        let menu = PickerModeMenu(loupe: CGRect(x: 1400, y: 400, width: 200, height: 200), bounds: builtIn.frame)
+        #expect(menu.frame == CGRect(x: 1260, y: 472, width: 128, height: 56))
+    }
+
+    @Test func hitTestFindsTheItem() {
+        let menu = PickerModeMenu(loupe: CGRect(x: 1400, y: 400, width: 200, height: 200), bounds: builtIn.frame)
+        #expect(menu.mode(at: CGPoint(x: 1300, y: 510)) == .single)
+        #expect(menu.mode(at: CGPoint(x: 1300, y: 490)) == .multi)
+        #expect(menu.mode(at: CGPoint(x: 1300, y: 474)) == nil)  // Padding.
+        #expect(menu.mode(at: CGPoint(x: 1000, y: 500)) == nil)
+    }
+
+    @Test func optionOpensTheMenuBesideTheLoupe() {
+        let session = session()
+        #expect(session.modeMenu == nil)
+        session.optionChanged(isDown: true)
+        let menu = try! #require(session.modeMenu)
+        #expect(menu == PickerModeMenu(loupe: session.loupeFrame, bounds: builtIn.frame))
+        #expect(session.loupeFrame == CGRect(x: -89.4, y: 880.9, width: 200, height: 200))
+    }
+
+    @Test func theLoupeFreezesWhileTheMenuIsOpen() {
+        let session = session()
+        session.optionChanged(isDown: true)
+        let item = session.modeMenu!.items[1].frame
+        let cursor = CGPoint(x: item.midX, y: item.midY)
+        session.pointerMoved(to: cursor)
+        #expect(session.point == start)
+        #expect(session.cursor == cursor)
+        #expect(session.hoveredMode == .multi)
+        #expect(session.centerColor == red)
+    }
+
+    @Test func clickingAnItemSelectsTheModeWithoutPicking() {
+        let session = session()
+        session.optionChanged(isDown: true)
+        let item = session.modeMenu!.items[1].frame
+        #expect(session.click(at: CGPoint(x: item.midX, y: item.midY), shift: false) == PickerStep.none)
+        #expect(session.mode == .multi)
+        #expect(session.click(at: CGPoint(x: 700, y: 300), shift: false) == PickerStep.none)
+        #expect(session.mode == .multi)
+    }
+
+    @Test func keysOtherThanEscDoNothingWhileTheMenuIsOpen() {
+        let session = session()
+        session.optionChanged(isDown: true)
+        #expect(session.confirm() == PickerStep.none)
+        session.arrow(.left, shift: true)
+        #expect(session.point == start)
+        #expect(session.cancel() == .close)
+    }
+
+    @Test func releasingOptionClosesTheMenuAndReturnsTheFrozenPoint() {
+        let session = session()
+        #expect(session.optionChanged(isDown: false) == nil)
+        session.optionChanged(isDown: true)
+        session.pointerMoved(to: CGPoint(x: 500, y: 500))
+        #expect(session.optionChanged(isDown: false) == start)
+        #expect(session.modeMenu == nil)
+        #expect(session.cursor == nil)
+        #expect(session.hoveredMode == nil)
+        // A second Option down while open changes nothing.
+        session.optionChanged(isDown: true)
+        session.pointerMoved(to: CGPoint(x: 500, y: 500))
+        session.optionChanged(isDown: true)
+        #expect(session.cursor == CGPoint(x: 500, y: 500))
+    }
+
+    @Test func optionHeldFromTheShortcutIsIgnoredUntilReleased() {
+        // Hyper+P includes Option: the user may still hold it when the picker opens.
+        let session = PickerSession(displays: [builtIn], loupe: LoupeSettings(), point: start, optionHeld: true)
+        session.optionChanged(isDown: true)
+        #expect(session.modeMenu == nil)
+        #expect(session.optionChanged(isDown: false) == nil)
+        session.optionChanged(isDown: true)
+        #expect(session.modeMenu != nil)
+    }
+
+    @Test func menuMovesDoNotCountAsAMove() {
+        let session = session()
+        session.setMode(.multi)
+        _ = session.click(at: start, shift: false)
+        session.optionChanged(isDown: true)
+        session.pointerMoved(to: CGPoint(x: 500, y: 500))
+        session.optionChanged(isDown: false)
+        #expect(session.confirm() == .close)
     }
 }

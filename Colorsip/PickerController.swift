@@ -1,11 +1,11 @@
 import AppKit
 import ColorsipCore
 
-/// The picker (`spec.md` §4.1–4.3): overlays every screen, follows the pointer with the loupe and
-/// reports the outcome. A thin layer over `PickerSession`.
+/// The picker (`spec.md` §4.1–4.4): overlays every screen, follows the pointer with the loupe and
+/// reports each pick. A thin layer over `PickerSession`.
 @MainActor
 final class PickerController {
-    /// Called once the picker has closed with a picked color.
+    /// Called for every pick, as it is made; a multi session calls it several times.
     var onPick: @MainActor (CSipColor) -> Void = { _ in }
 
     private let model: AppModel
@@ -15,7 +15,7 @@ final class PickerController {
     private var screenObserver: (any NSObjectProtocol)?
     private lazy var sampler = ScreenSampler(
         onFrame: { [weak self] in self?.resample() },
-        onError: { [weak self] _ in self?.close(.cancel) })
+        onError: { [weak self] _ in self?.close() })
 
     init(model: AppModel) {
         self.model = model
@@ -30,7 +30,10 @@ final class PickerController {
         let displays = screens.map { screen, id in
             PickerDisplay(id: id, frame: screen.frame, scale: screen.backingScaleFactor)
         }
-        session = PickerSession(displays: displays, loupe: model.settings.settings.loupe, point: NSEvent.mouseLocation)
+        session = PickerSession(
+            displays: displays, loupe: model.settings.settings.loupe, point: NSEvent.mouseLocation,
+            optionHeld: NSEvent.modifierFlags.contains(.option))
+        session?.shiftChanged(isDown: NSEvent.modifierFlags.contains(.shift))
         panels = screens.map { screen, id in PickerOverlayPanel(screen: screen, displayID: id, content: LoupeView()) }
 
         NSApp.activate()
@@ -38,7 +41,10 @@ final class PickerController {
         panels.first { $0.displayID == session?.display.id }?.makeKey()
         NSCursor.hide()
         monitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown, .rightMouseDown, .scrollWheel, .keyDown]
+            matching: [
+                .mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown, .rightMouseDown, .scrollWheel,
+                .keyDown, .flagsChanged,
+            ]
         ) { [weak self] event in
             guard let self else { return event }
             return handle(event) ? nil : event
@@ -47,7 +53,7 @@ final class PickerController {
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.close(.cancel) }
+            MainActor.assumeIsolated { self?.close() }
         }
         displayChanged()
     }
@@ -61,7 +67,11 @@ final class PickerController {
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged:
             moved(to: NSEvent.mouseLocation)
         case .leftMouseDown:
-            close(.pick)
+            perform(session.click(at: NSEvent.mouseLocation, shift: event.modifierFlags.contains(.shift)))
+        case .flagsChanged:
+            session.shiftChanged(isDown: event.modifierFlags.contains(.shift))
+            optionChanged(isDown: event.modifierFlags.contains(.option), session: session)
+            return false
         case .rightMouseDown:
             break
         case .scrollWheel:
@@ -83,17 +93,44 @@ final class PickerController {
         let shift = event.modifierFlags.contains(.shift)
         let direction: ArrowDirection
         switch Int(event.keyCode) {
-        case 53: close(.cancel); return true  // Esc
-        case 36, 76, 49: close(.pick); return true  // Return, keypad Enter, Space
+        case 53: perform(session.cancel()); return true  // Esc
+        case 36, 76, 49: perform(session.confirm()); return true  // Return, keypad Enter, Space
         case 123: direction = .left
         case 124: direction = .right
         case 125: direction = .down
         case 126: direction = .up
         default: return true  // Swallow other keys while picking.
         }
+        guard session.modeMenu == nil else { return true }
         warp(to: session.arrow(direction, shift: shift))
         resample()
         return true
+    }
+
+    /// Option opens the mode menu and shows the cursor so it can reach the menu; releasing it puts
+    /// the pointer back under the frozen loupe.
+    private func optionChanged(isDown: Bool, session: PickerSession) {
+        let wasOpen = session.modeMenu != nil
+        let frozen = session.optionChanged(isDown: isDown)
+        if !wasOpen && session.modeMenu != nil {
+            NSCursor.unhide()
+        } else if let frozen {
+            warp(to: frozen)
+            NSCursor.hide()
+        }
+        resample()
+    }
+
+    private func perform(_ step: PickerStep) {
+        switch step {
+        case .pick(let color, let close):
+            onPick(color)
+            if close { self.close() } else { resample() }
+        case .close:
+            close()
+        case .none:
+            resample()  // A mode chosen in the menu.
+        }
     }
 
     private func moved(to point: CGPoint) {
@@ -139,7 +176,8 @@ final class PickerController {
             gridSize: session.loupe.gridSize,
             samples: session.samples,
             colorSpace: sampler.frame?.colorSpace,
-            label: session.label(format: model.outputFormat))
+            label: session.label(format: model.outputFormat),
+            menu: session.modeMenu.map { LoupeView.Menu(layout: $0, mode: session.mode, hovered: session.hoveredMode) })
         for panel in panels {
             (panel.contentView as? LoupeView)?.content = panel.displayID == session.display.id ? content : nil
         }
@@ -147,8 +185,9 @@ final class PickerController {
 
     // MARK: Closing
 
-    private func close(_ action: PickerAction) {
-        guard let session, let outcome = session.finish(action) else { return }
+    /// Closes the picker. Picks were already reported as they were made.
+    private func close() {
+        guard let session else { return }
         self.session = nil
         sampler.stop()
         if let monitor { NSEvent.removeMonitor(monitor) }
@@ -157,10 +196,10 @@ final class PickerController {
         screenObserver = nil
         panels.forEach { $0.orderOut(nil) }
         panels = []
-        NSCursor.unhide()
+        // With the mode menu open, the cursor is already showing.
+        if session.modeMenu == nil { NSCursor.unhide() }
         // Saved once per session, not on every wheel notch.
         model.settings.update { $0.loupe = session.loupe }
-        if case .picked(let color) = outcome { onPick(color) }
     }
 }
 

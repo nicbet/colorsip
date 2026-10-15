@@ -52,9 +52,9 @@ final class AppModel {
         copyValue(of: color, as: format ?? outputFormat, to: clipboard)
     }
 
-    /// Adds a pick to Color History under its friendly name.
-    func recordPick(_ color: CSipColor) {
-        history.record(color, name: color.friendlyName)
+    /// Sends a pick to Color History, the pick target and the clipboard (`spec.md` §4.5).
+    func didPick(_ color: CSipColor) {
+        routePick(color, format: outputFormat, history: history, library: library, clipboard: clipboard)
     }
 
     /// Creates a palette and opens its Rename popover.

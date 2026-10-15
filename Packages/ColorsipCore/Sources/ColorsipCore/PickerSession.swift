@@ -61,10 +61,13 @@ public struct LoupeLayout: Equatable, Sendable {
 public struct PickerLabel: Equatable, Sendable {
     public var value: String
     public var name: String
+    /// Whether the next click keeps the picker open: multi mode, or Shift held.
+    public var isMulti: Bool
 
-    public init(value: String, name: String) {
+    public init(value: String, name: String, isMulti: Bool = false) {
         self.value = value
         self.name = name
+        self.isMulti = isMulti
     }
 }
 
@@ -72,17 +75,67 @@ public enum ArrowDirection: Sendable {
     case left, right, up, down
 }
 
-public enum PickerAction: Sendable {
-    case pick, cancel
+/// What the picker does with picks (`spec.md` §4.4).
+public enum PickerMode: Sendable {
+    /// The first pick closes the picker.
+    case single
+    /// Every click picks; Esc, or Return without moving, finishes.
+    case multi
+
+    /// The modes the Option menu offers, top to bottom. Contrast joins them in V2.
+    public static let menu: [PickerMode] = [.single, .multi]
 }
 
-public enum PickerOutcome: Equatable, Sendable {
-    case picked(CSipColor)
-    case cancelled
+/// What the picker should do after an input.
+public enum PickerStep: Equatable, Sendable {
+    /// Route the color as a pick, then close the picker if `close`.
+    case pick(CSipColor, close: Bool)
+    case close
+    case none
 }
 
-/// The state of one open picker (`spec.md` §4.2–4.3): where the pointer is, which pixels the loupe
-/// shows, and the loupe size. The overlay renders it; the screen sampler fills in `samples`.
+/// The Option mode menu (`spec.md` §4.3), in global coordinates (y up): fixed-size items beside the
+/// loupe, on the right unless that leaves the display, vertically centered on it and kept on the
+/// display.
+public struct PickerModeMenu: Equatable, Sendable {
+    public struct Item: Equatable, Sendable {
+        public let mode: PickerMode
+        public let frame: CGRect
+    }
+
+    static let itemSize = CGSize(width: 120, height: 24)
+    static let padding = 4.0
+    static let gap = 12.0
+
+    public let frame: CGRect
+    /// Top to bottom, in ``PickerMode/menu`` order.
+    public let items: [Item]
+
+    public init(loupe: CGRect, bounds: CGRect) {
+        let size = CGSize(
+            width: Self.itemSize.width + Self.padding * 2,
+            height: Self.itemSize.height * Double(PickerMode.menu.count) + Self.padding * 2)
+        var x = loupe.maxX + Self.gap
+        if x + size.width > bounds.maxX { x = loupe.minX - Self.gap - size.width }
+        let y = min(max(loupe.midY - size.height / 2, bounds.minY), bounds.maxY - size.height)
+        frame = CGRect(origin: CGPoint(x: x, y: y), size: size)
+        let top = frame.maxY - Self.padding
+        items = PickerMode.menu.enumerated().map { i, mode in
+            Item(mode: mode, frame: CGRect(
+                origin: CGPoint(x: x + Self.padding, y: top - Self.itemSize.height * Double(i + 1)),
+                size: Self.itemSize))
+        }
+    }
+
+    /// The mode of the item at `point`, if any.
+    public func mode(at point: CGPoint) -> PickerMode? {
+        items.first { $0.frame.contains(point) }?.mode
+    }
+}
+
+/// The state of one open picker (`spec.md` §4.2–4.4): where the pointer is, which pixels the loupe
+/// shows, the loupe size and the mode. The overlay renders it; the screen sampler fills in
+/// `samples`. Input methods return the ``PickerStep`` the caller carries out.
 @MainActor
 @Observable
 public final class PickerSession {
@@ -95,14 +148,27 @@ public final class PickerSession {
     public private(set) var samples: [PixelSample?] = []
     /// The center pixel's color, or `nil` until the display's first sample.
     public private(set) var centerColor: CSipColor?
+    /// Every session starts in single mode.
+    public private(set) var mode = PickerMode.single
+    /// Where the visible cursor is while the mode menu is open (Option held), or `nil` when closed.
+    /// The loupe stays frozen at `point` meanwhile.
+    public private(set) var cursor: CGPoint?
+    private var isModeMenuOpen = false
+    private var isShiftHeld = false
+    /// Whether the loupe moved since the last pick; true before the first.
+    private var movedSincePick = true
+    /// An Option still held from the shortcut (Hyper+P) doesn't open the menu until it is released.
+    private var optionArmed: Bool
 
     @ObservationIgnored private var scrollSteps = LoupeScroll()
 
-    public init(displays: [PickerDisplay], loupe: LoupeSettings, point: CGPoint) {
+    /// `optionHeld`: whether Option is down as the picker opens.
+    public init(displays: [PickerDisplay], loupe: LoupeSettings, point: CGPoint, optionHeld: Bool = false) {
         precondition(!displays.isEmpty, "The picker needs a display")
         self.displays = displays
         self.loupe = loupe
         self.point = point
+        optionArmed = !optionHeld
         display = PickerGeometry.display(at: point, in: displays) ?? displays[0]
     }
 
@@ -112,20 +178,65 @@ public final class PickerSession {
         PixelGrid(center: pixel, size: loupe.gridSize, pixelWidth: display.pixelWidth, pixelHeight: display.pixelHeight)
     }
 
-    /// Follows the pointer. In a gap between displays, the loupe stays where it was.
+    /// The loupe's circle, in global coordinates.
+    public var loupeFrame: CGRect {
+        let d = Double(loupe.diameter)
+        return CGRect(x: point.x - d / 2, y: point.y - d / 2, width: d, height: d)
+    }
+
+    /// The Option menu, while it is open.
+    public var modeMenu: PickerModeMenu? {
+        isModeMenuOpen ? PickerModeMenu(loupe: loupeFrame, bounds: display.frame) : nil
+    }
+
+    /// The menu item under the cursor.
+    public var hoveredMode: PickerMode? {
+        cursor.flatMap { modeMenu?.mode(at: $0) }
+    }
+
+    /// Follows the pointer. In a gap between displays, the loupe stays where it was. While the mode
+    /// menu is open, only the cursor moves.
     public func pointerMoved(to point: CGPoint) {
+        if isModeMenuOpen {
+            cursor = point
+            return
+        }
         guard let display = PickerGeometry.display(at: point, in: displays) else { return }
         if display != self.display {
             self.display = display
             samples = []
             centerColor = nil
         }
+        if point != self.point { movedSincePick = true }
         self.point = point
     }
 
+    /// Option down opens the mode menu and freezes the loupe; Option up closes it and returns the
+    /// frozen point to move the pointer back to (`nil` if the menu wasn't open).
+    @discardableResult
+    public func optionChanged(isDown: Bool) -> CGPoint? {
+        if !isDown { optionArmed = true }
+        guard optionArmed, isDown != isModeMenuOpen else { return nil }
+        isModeMenuOpen = isDown
+        cursor = isDown ? point : nil
+        return isDown ? nil : point
+    }
+
+    /// Shift makes the next click keep the picker open, which the label shows.
+    public func shiftChanged(isDown: Bool) {
+        isShiftHeld = isDown
+    }
+
+    public func setMode(_ mode: PickerMode) {
+        self.mode = mode
+    }
+
     /// Moves 1 physical pixel, or 10 with Shift, and returns the new point to move the pointer to.
+    /// Does nothing while the mode menu is open.
     @discardableResult
     public func arrow(_ direction: ArrowDirection, shift: Bool) -> CGPoint {
+        guard !isModeMenuOpen else { return point }
+        movedSincePick = true
         let distance = shift ? 10 : 1
         let (dx, dy) = switch direction {
         case .left: (-distance, 0)
@@ -151,14 +262,42 @@ public final class PickerSession {
     }
 
     public func label(format: OutputFormat) -> PickerLabel? {
-        centerColor.map { PickerLabel(value: $0.formatted(as: format), name: $0.friendlyName) }
+        centerColor.map {
+            PickerLabel(value: $0.formatted(as: format), name: $0.friendlyName, isMulti: mode == .multi || isShiftHeld)
+        }
     }
 
-    /// The outcome of picking or cancelling. Picking before the first sample does nothing (`nil`).
-    public func finish(_ action: PickerAction) -> PickerOutcome? {
-        switch action {
-        case .pick: centerColor.map(PickerOutcome.picked)
-        case .cancel: .cancelled
+    // MARK: Picking (`spec.md` §4.3–4.4)
+
+    /// A click at `location`. It picks; it closes in single mode unless Shift is down. While the mode
+    /// menu is open, a click on an item selects that mode instead, and other clicks do nothing.
+    public func click(at location: CGPoint, shift: Bool) -> PickerStep {
+        if let menu = modeMenu {
+            if let mode = menu.mode(at: location) { self.mode = mode }
+            return .none
         }
+        return pick(close: mode == .single && !shift)
+    }
+
+    /// Return or Space. It picks and closes in single mode. In multi mode it picks if the loupe
+    /// moved since the last pick, and finishes otherwise.
+    public func confirm() -> PickerStep {
+        guard !isModeMenuOpen else { return .none }
+        switch mode {
+        case .single: return pick(close: true)
+        case .multi: return movedSincePick ? pick(close: false) : .close
+        }
+    }
+
+    /// Esc closes the picker. Picks already made are kept: they were routed as they happened.
+    public func cancel() -> PickerStep {
+        .close
+    }
+
+    /// Picks the center color, or does nothing before the first sample.
+    private func pick(close: Bool) -> PickerStep {
+        guard let centerColor else { return .none }
+        movedSincePick = false
+        return .pick(centerColor, close: close)
     }
 }

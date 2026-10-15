@@ -117,6 +117,16 @@ extension LibraryController {
 
     // MARK: - Swatches
 
+    /// Inserts a pick at the front of the pick target's ungrouped section (`spec.md` §4.5). Returns
+    /// `nil` when there is no target or the section already has the color.
+    @discardableResult
+    public func addPick(_ color: CSipColor, name: String, at date: Date = .now) -> Swatch.ID? {
+        guard let target = library.pickTarget else { return nil }
+        return try? perform("Pick Color") { library throws(LibraryError) in
+            try library.insertSwatch(color: color, name: name, into: .ungrouped(target), at: date)
+        }
+    }
+
     @discardableResult
     public func renameSwatch(_ id: Swatch.ID, in section: SectionID, to name: String, at date: Date = .now) -> Bool {
         guard let name = name.trimmedNonEmpty else { return false }

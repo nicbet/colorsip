@@ -25,7 +25,8 @@ final class PickerOverlayPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
-/// Draws the loupe and its label (`spec.md` §4.2) when the pointer is on this view's display.
+/// Draws the loupe, its label (`spec.md` §4.2) and the Option mode menu (§4.3) when the pointer is
+/// on this view's display.
 final class LoupeView: NSView {
     struct Content {
         var point: CGPoint
@@ -34,6 +35,15 @@ final class LoupeView: NSView {
         var samples: [PixelSample?]
         var colorSpace: CGColorSpace?
         var label: PickerLabel?
+        /// `nil` unless Option is held.
+        var menu: Menu?
+    }
+
+    struct Menu {
+        /// In global coordinates.
+        var layout: PickerModeMenu
+        var mode: PickerMode
+        var hovered: PickerMode?
     }
 
     /// `nil` hides the loupe: the pointer is on another display.
@@ -55,6 +65,9 @@ final class LoupeView: NSView {
         let layout = LoupeLayout(pointer: local, diameter: content.diameter, labelSize: labelSize, bounds: bounds)
         drawLoupe(in: layout.loupe, content: content, context: context)
         if let label { drawLabel(label, in: layout.label) }
+        if let menu = content.menu {
+            drawMenu(menu, offset: CGPoint(x: -window.frame.minX, y: -window.frame.minY))
+        }
     }
 
     private func drawLoupe(in rect: CGRect, content: Content, context: CGContext) {
@@ -127,29 +140,68 @@ final class LoupeView: NSView {
             provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
     }
 
-    private func labelStrings(_ label: PickerLabel) -> (value: NSAttributedString, name: NSAttributedString) {
-        (
+    private static let badgeFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
+
+    /// The label's lines, top to bottom: the value, the name, and "MULTI" when the next click keeps
+    /// the picker open.
+    private func labelStrings(_ label: PickerLabel) -> [NSAttributedString] {
+        var lines = [
             NSAttributedString(string: label.value, attributes: [.font: Self.valueFont, .foregroundColor: NSColor.white]),
-            NSAttributedString(string: label.name, attributes: [.font: Self.nameFont, .foregroundColor: NSColor(white: 1, alpha: 0.75)])
-        )
+            NSAttributedString(string: label.name, attributes: [.font: Self.nameFont, .foregroundColor: NSColor(white: 1, alpha: 0.75)]),
+        ]
+        if label.isMulti {
+            lines.append(NSAttributedString(string: "MULTI", attributes: [
+                .font: Self.badgeFont, .foregroundColor: NSColor.controlAccentColor, .kern: 1,
+            ]))
+        }
+        return lines
     }
 
-    private static func size(of label: (value: NSAttributedString, name: NSAttributedString)) -> CGSize {
-        let value = label.value.size()
-        let name = label.name.size()
+    private static func size(of lines: [NSAttributedString]) -> CGSize {
+        let sizes = lines.map { $0.size() }
         return CGSize(
-            width: ceil(max(value.width, name.width)) + labelPadding.width * 2,
-            height: ceil(value.height + name.height) + labelPadding.height * 2)
+            width: ceil(sizes.map(\.width).max() ?? 0) + labelPadding.width * 2,
+            height: ceil(sizes.map(\.height).reduce(0, +)) + labelPadding.height * 2)
     }
 
-    private func drawLabel(_ label: (value: NSAttributedString, name: NSAttributedString), in rect: CGRect) {
+    private func drawLabel(_ lines: [NSAttributedString], in rect: CGRect) {
         let capsule = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
         NSColor(white: 0.1, alpha: 0.85).setFill()
         capsule.fill()
-        let value = label.value.size()
-        let name = label.name.size()
-        let top = rect.maxY - Self.labelPadding.height
-        label.value.draw(at: CGPoint(x: rect.midX - value.width / 2, y: top - value.height))
-        label.name.draw(at: CGPoint(x: rect.midX - name.width / 2, y: top - value.height - name.height))
+        var top = rect.maxY - Self.labelPadding.height
+        for line in lines {
+            let size = line.size()
+            top -= size.height
+            line.draw(at: CGPoint(x: rect.midX - size.width / 2, y: top))
+        }
+    }
+
+    private static let menuFont = NSFont.systemFont(ofSize: 13)
+
+    private static func title(_ mode: PickerMode) -> String {
+        switch mode {
+        case .single: "Single"
+        case .multi: "Multi"
+        }
+    }
+
+    /// The menu in the label's style: the current mode checked, the hovered item highlighted.
+    private func drawMenu(_ menu: Menu, offset: CGPoint) {
+        let frame = menu.layout.frame.offsetBy(dx: offset.x, dy: offset.y)
+        NSColor(white: 0.1, alpha: 0.85).setFill()
+        NSBezierPath(roundedRect: frame, xRadius: 8, yRadius: 8).fill()
+        for item in menu.layout.items {
+            let rect = item.frame.offsetBy(dx: offset.x, dy: offset.y)
+            if item.mode == menu.hovered {
+                NSColor.controlAccentColor.setFill()
+                NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+            }
+            let attributes: [NSAttributedString.Key: Any] = [.font: Self.menuFont, .foregroundColor: NSColor.white]
+            let check = NSAttributedString(string: item.mode == menu.mode ? "✓" : "", attributes: attributes)
+            let title = NSAttributedString(string: Self.title(item.mode), attributes: attributes)
+            let y = rect.midY - title.size().height / 2
+            check.draw(at: CGPoint(x: rect.minX + 8, y: y))
+            title.draw(at: CGPoint(x: rect.minX + 26, y: y))
+        }
     }
 }
