@@ -31,6 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pasteTargets = PasteTargetTracker(ownBundleID: Bundle.main.bundleIdentifier)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // `Colorsip --snapshot <dir>` renders the README screenshots and quits.
+        if let directory = Snapshot.requestedDirectory {
+            Snapshot.run(to: directory)
+            return
+        }
         let libraryLog = Logger(subsystem: "com.nicolas-bettenburg.colorsip", category: "library")
         for issue in model.library.loadIssues + [model.history.loadIssue].compactMap({ $0 }) {
             libraryLog.error("Library load issue: \(String(describing: issue), privacy: .public)")

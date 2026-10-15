@@ -11,6 +11,8 @@ VERBOSE ?= 0
 CORE_PACKAGE_DIR := Packages/ColorsipCore
 BUILD_DIR := Builds
 DERIVED_DATA_DIR := $(BUILD_DIR)/DerivedData
+SNAPSHOT_DIR := $(BUILD_DIR)/snapshots
+SCREENSHOTS := popover picker editor settings
 APP_PATH := $(DERIVED_DATA_DIR)/Build/Products/$(CONFIGURATION)/$(SCHEME).app
 SIGNING_IDENTITY := Colorsip Local Signing
 HAS_SIGNING_IDENTITY := $(shell security find-identity -v -p codesigning 2>/dev/null | grep -q '"$(SIGNING_IDENTITY)"' && echo 1)
@@ -29,7 +31,7 @@ else
 SIGNING_FLAGS :=
 endif
 
-.PHONY: help build test clean signing-cert reset-permissions
+.PHONY: help build test snapshot screenshots clean signing-cert reset-permissions
 
 help:
 	@printf '%s\n' \
@@ -38,6 +40,8 @@ help:
 		'  build              Build the Colorsip app in Release configuration into $(BUILD_DIR)/' \
 		'                     (VERBOSE=1 for full xcodebuild output)' \
 		'  test               Run the ColorsipCore test suite' \
+		'  snapshot           Render the popover, picker, editor and Settings to $(SNAPSHOT_DIR)/' \
+		'  screenshots        Refresh the README screenshots in docs/ (needs cwebp: brew install webp)' \
 		'  clean              Remove $(BUILD_DIR)/' \
 		'  signing-cert       Create a local code-signing certificate so permissions survive rebuilds' \
 		'  reset-permissions  Reset Screen Recording and Accessibility grants'
@@ -54,6 +58,17 @@ endif
 
 test:
 	$(SWIFT) test --package-path $(CORE_PACKAGE_DIR)
+
+# Rendered offscreen from a sample library: needs no permission and leaves your library alone.
+snapshot: build
+	@rm -rf $(SNAPSHOT_DIR)
+	@$(BUILD_DIR)/$(SCHEME).app/Contents/MacOS/$(SCHEME) --snapshot $(SNAPSHOT_DIR)
+
+screenshots: snapshot
+	@for name in $(SCREENSHOTS); do for theme in light dark; do \
+		cwebp -quiet -q 92 -m 6 -exact "$(SNAPSHOT_DIR)/$$name-$$theme.png" -o "docs/$$name-$$theme.webp"; \
+	done; done
+	@ls -l docs
 
 clean:
 	rm -rf $(BUILD_DIR)
