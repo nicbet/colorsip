@@ -65,17 +65,8 @@ public enum SettingsPane: String, Sendable, CaseIterable {
         }
     }
 
-    /// Whether the pane has content yet. Profiles comes with cs-615265; until then it's hidden
-    /// rather than shown empty.
-    var hasContent: Bool {
-        switch self {
-        case .profiles: false
-        default: true
-        }
-    }
-
     /// The panes visible in `release`, in display order.
     public static func visible(for release: Release) -> [SettingsPane] {
-        allCases.filter { $0.release <= release && $0.hasContent }
+        allCases.filter { $0.release <= release }
     }
 }

@@ -44,11 +44,13 @@ final class PickerController {
         }
         session = PickerSession(
             displays: displays, loupe: model.settings.settings.loupe, point: NSEvent.mouseLocation,
+            windows: Self.otherAppsWindows(), profiles: model.settings.settings.profiles,
             optionHeld: NSEvent.modifierFlags.contains(.option))
         session?.shiftChanged(isDown: NSEvent.modifierFlags.contains(.shift))
         panels = screens.map { screen, id in PickerOverlayPanel(screen: screen, displayID: id, content: LoupeView()) }
 
-        NSApp.activate()
+        // Colorsip isn't activated: the app under the pointer keeps its active appearance. The
+        // non-activating panels still become key and get the keyboard.
         panels.forEach { $0.orderFrontRegardless() }
         panels.first { $0.displayID == session?.display.id }?.makeKey()
         NSCursor.hide()
@@ -68,6 +70,32 @@ final class PickerController {
             MainActor.assumeIsolated { self?.close() }
         }
         displayChanged()
+    }
+
+    /// The other apps' on-screen windows, front to back, for Smart Profiles (`spec.md` §6). Taken
+    /// once per session: windows can't move while the picker holds all input.
+    private static func otherAppsWindows() -> [PickerWindow] {
+        guard let primary = NSScreen.screens.first,
+            let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[CFString: Any]]
+        else { return [] }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        var bundleIDs: [pid_t: String?] = [:]
+        return list.compactMap { info in
+            guard let pid = (info[kCGWindowOwnerPID] as? NSNumber)?.int32Value, pid != ownPID,
+                (info[kCGWindowAlpha] as? NSNumber)?.doubleValue ?? 1 > 0,
+                let dictionary = info[kCGWindowBounds] as? NSDictionary,
+                let bounds = CGRect(dictionaryRepresentation: dictionary)
+            else { return nil }
+            let bundleID = bundleIDs[pid] ?? {
+                let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+                bundleIDs[pid] = id
+                return id
+            }()
+            // Window bounds have their origin at the top left of the primary display, y down.
+            let frame = CGRect(x: bounds.minX, y: primary.frame.maxY - bounds.maxY, width: bounds.width, height: bounds.height)
+            return PickerWindow(frame: frame, bundleID: bundleID)
+        }
     }
 
     // MARK: Events

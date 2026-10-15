@@ -218,3 +218,25 @@ struct CaptureColorTests {
         #expect(wrong.isEmpty, "\(wrong.count) differ, e.g. \(wrong.prefix(5))")
     }
 }
+
+@Suite("Picker windows")
+struct PickerWindowTests {
+    private let front = PickerWindow(frame: CGRect(x: 50, y: 50, width: 100, height: 100), bundleID: "front")
+    private let back = PickerWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 400), bundleID: "back")
+
+    @Test func theFirstWindowContainingThePointWins() {
+        let windows = [front, back]
+        #expect(PickerGeometry.window(at: CGPoint(x: 100, y: 100), in: windows) == front)
+        #expect(PickerGeometry.window(at: CGPoint(x: 10, y: 10), in: windows) == back)
+    }
+
+    @Test func noWindowAtThePoint() {
+        #expect(PickerGeometry.window(at: CGPoint(x: 500, y: 10), in: [front, back]) == nil)
+        #expect(PickerGeometry.window(at: .zero, in: []) == nil)
+    }
+
+    @Test func maxEdgesAreExclusive() {
+        #expect(PickerGeometry.window(at: CGPoint(x: 150, y: 100), in: [front]) == nil)
+        #expect(PickerGeometry.window(at: CGPoint(x: 50, y: 50), in: [front]) == front)
+    }
+}

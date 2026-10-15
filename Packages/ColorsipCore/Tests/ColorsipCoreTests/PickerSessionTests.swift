@@ -86,7 +86,7 @@ struct LoupeLayoutTests {
 @Suite("Picker session")
 struct PickerSessionTests {
     private func session(at point: CGPoint = CGPoint(x: 10.6, y: 980.9)) -> PickerSession {
-        PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: point)
+        PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: point, profiles: .noConversion)
     }
 
     private let red = CSipColor(.displayP3, 1, 0, 0)
@@ -152,7 +152,7 @@ struct PickerSessionTests {
     @Test func labelShowsTheValueAndName() {
         let session = session()
         session.sampled([], center: CSipColor(.srgb, 0, 0, 0))
-        #expect(session.label(format: .cssHex) == PickerLabel(value: "#000000", name: "Black"))
+        #expect(session.label(format: .cssHex) == PickerLabel(value: "#000000", name: "Black", profile: .displayP3))
         #expect(session.label(format: .cssRGB)?.value == "rgb(0 0 0)")
     }
 
@@ -166,7 +166,7 @@ struct PickerModeTests {
     private let green = CSipColor(.displayP3, 0, 1, 0)
 
     private func session(sampled: Bool = true) -> PickerSession {
-        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start)
+        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start, profiles: .noConversion)
         if sampled { session.sampled([], center: red) }
         return session
     }
@@ -270,7 +270,7 @@ struct PickerModeMenuTests {
     private let red = CSipColor(.displayP3, 1, 0, 0)
 
     private func session() -> PickerSession {
-        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start)
+        let session = PickerSession(displays: [builtIn, external], loupe: LoupeSettings(), point: start, profiles: .noConversion)
         session.sampled([], center: red)
         return session
     }
@@ -355,7 +355,7 @@ struct PickerModeMenuTests {
 
     @Test func optionHeldFromTheShortcutIsIgnoredUntilReleased() {
         // Hyper+P includes Option: the user may still hold it when the picker opens.
-        let session = PickerSession(displays: [builtIn], loupe: LoupeSettings(), point: start, optionHeld: true)
+        let session = PickerSession(displays: [builtIn], loupe: LoupeSettings(), point: start, profiles: .noConversion, optionHeld: true)
         session.optionChanged(isDown: true)
         #expect(session.modeMenu == nil)
         #expect(session.optionChanged(isDown: false) == nil)
@@ -371,5 +371,84 @@ struct PickerModeMenuTests {
         session.pointerMoved(to: CGPoint(x: 500, y: 500))
         session.optionChanged(isDown: false)
         #expect(session.confirm() == .close)
+    }
+}
+
+extension SmartProfiles {
+    /// Every app, and the fallback, in Display P3: samples come out as they went in.
+    static let noConversion = SmartProfiles(rules: [], fallback: .displayP3)
+}
+
+@MainActor
+@Suite("Picker profiles")
+struct PickerProfileTests {
+    private let start = CGPoint(x: 100, y: 100)
+    /// Outside sRGB.
+    private let p3Red = CSipColor(.displayP3, 1, 0, 0)
+    private let windows = [
+        // Front to back: a Safari window over an Xcode window.
+        PickerWindow(frame: CGRect(x: 50, y: 50, width: 100, height: 100), bundleID: "com.apple.Safari"),
+        PickerWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 400), bundleID: "com.apple.dt.Xcode"),
+        PickerWindow(frame: CGRect(x: 500, y: 0, width: 100, height: 100), bundleID: nil),
+    ]
+
+    private func session(fallback: TargetProfile = .srgb) -> PickerSession {
+        let session = PickerSession(
+            displays: [builtIn], loupe: LoupeSettings(), point: start, windows: windows,
+            profiles: SmartProfiles(rules: SmartProfiles.defaultRules, fallback: fallback))
+        session.sampled([], center: p3Red)
+        return session
+    }
+
+    @Test func theFrontWindowUnderThePointerChoosesTheProfile() {
+        let session = session()
+        #expect(session.profile == .srgb)
+        #expect(session.centerColor == p3Red.converted(to: .srgb))
+        #expect(session.click(at: start, shift: false) == .pick(p3Red.converted(to: .srgb), close: true))
+    }
+
+    @Test func conversionToSRGBIsNotClamped() throws {
+        let color = try #require(session().centerColor)
+        #expect(color.colorSpace == .srgb)
+        #expect(color.components[0] > 1)
+        #expect(color.components[1] < 0)
+    }
+
+    @Test func displayP3KeepsTheSampleAsIs() {
+        let session = session()
+        session.pointerMoved(to: CGPoint(x: 300, y: 300))
+        #expect(session.profile == .displayP3)
+        #expect(session.centerColor == p3Red)
+    }
+
+    @Test func noWindowOrNoBundleIDUsesTheFallback() {
+        let session = session(fallback: .genericRGB)
+        session.pointerMoved(to: CGPoint(x: 700, y: 700))
+        #expect(session.profile == .genericRGB)
+        #expect(session.centerColor?.colorSpace == .genericRGB)
+        session.pointerMoved(to: CGPoint(x: 550, y: 50))
+        #expect(session.profile == .genericRGB)
+    }
+
+    @Test func movingToAnotherWindowReconvertsTheCurrentSample() {
+        let session = session()
+        session.pointerMoved(to: CGPoint(x: 300, y: 300))
+        #expect(session.centerColor?.colorSpace == .displayP3)
+        session.pointerMoved(to: start)
+        #expect(session.centerColor?.colorSpace == .srgb)
+    }
+
+    @Test func labelCarriesTheProfile() {
+        let session = session()
+        #expect(session.label(format: .cssHex)?.profile == .srgb)
+        session.pointerMoved(to: CGPoint(x: 300, y: 300))
+        #expect(session.label(format: .cssHex)?.profile == .displayP3)
+    }
+
+    @Test func withoutWindowsEverythingUsesTheFallback() {
+        let session = PickerSession(displays: [builtIn], loupe: LoupeSettings(), point: start)
+        session.sampled([], center: p3Red)
+        #expect(session.profile == .srgb)
+        #expect(session.centerColor == p3Red.converted(to: .srgb))
     }
 }

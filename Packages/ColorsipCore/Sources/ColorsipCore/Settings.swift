@@ -8,7 +8,8 @@ import Observation
 ///   "formatVersion": 1,
 ///   "defaultFormat": "cssHex",
 ///   "shortcuts": { "picker": { "keyCode": 35, "modifiers": ["command", "control", "option"] } },
-///   "loupe": { "diameter": 200, "gridSize": 11 }
+///   "loupe": { "diameter": 200, "gridSize": 11 },
+///   "profiles": { "rules": [{ "bundleID": "com.apple.Safari", "name": "Safari", "profile": "srgb" }], "fallback": "srgb" }
 /// }
 /// ```
 ///
@@ -22,11 +23,13 @@ public struct AppSettings: Equatable, Sendable, Codable {
     public var shortcuts = ShortcutBindings()
     /// The loupe size. The picker's mouse wheel and Settings ▸ Picker change the same values.
     public var loupe = LoupeSettings()
+    /// Smart Profiles: Settings ▸ Profiles.
+    public var profiles = SmartProfiles()
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, defaultFormat, shortcuts, loupe
+        case formatVersion, defaultFormat, shortcuts, loupe, profiles
     }
 
     public init(from decoder: any Decoder) throws {
@@ -37,6 +40,7 @@ public struct AppSettings: Equatable, Sendable, Codable {
         defaultFormat = (try? container.decodeIfPresent(OutputFormat.self, forKey: .defaultFormat)) ?? .default
         shortcuts = (try? container.decodeIfPresent(ShortcutBindings.self, forKey: .shortcuts)) ?? ShortcutBindings()
         loupe = (try? container.decodeIfPresent(LoupeSettings.self, forKey: .loupe)) ?? LoupeSettings()
+        profiles = (try? container.decodeIfPresent(SmartProfiles.self, forKey: .profiles)) ?? SmartProfiles()
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -45,6 +49,7 @@ public struct AppSettings: Equatable, Sendable, Codable {
         try container.encode(defaultFormat, forKey: .defaultFormat)
         try container.encode(shortcuts, forKey: .shortcuts)
         try container.encode(loupe, forKey: .loupe)
+        try container.encode(profiles, forKey: .profiles)
     }
 }
 

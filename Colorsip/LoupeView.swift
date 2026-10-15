@@ -142,11 +142,18 @@ final class LoupeView: NSView {
 
     private static let badgeFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
 
-    /// The label's lines, top to bottom: the value, the name, and "MULTI" when the next click keeps
-    /// the picker open.
+    /// The label's lines, top to bottom: the value with the profile's badge (`spec.md` §6), the
+    /// name, and "MULTI" when the next click keeps the picker open.
     private func labelStrings(_ label: PickerLabel) -> [NSAttributedString] {
-        var lines = [
-            NSAttributedString(string: label.value, attributes: [.font: Self.valueFont, .foregroundColor: NSColor.white]),
+        let value = NSMutableAttributedString(
+            string: label.value, attributes: [.font: Self.valueFont, .foregroundColor: NSColor.white])
+        value.append(NSAttributedString(string: "  "))
+        value.append(NSAttributedString(string: label.profile.badge, attributes: [
+            .font: Self.badgeFont, .foregroundColor: NSColor(white: 1, alpha: 0.6), .kern: 0.5,
+            .baselineOffset: 1,
+        ]))
+        var lines: [NSAttributedString] = [
+            value,
             NSAttributedString(string: label.name, attributes: [.font: Self.nameFont, .foregroundColor: NSColor(white: 1, alpha: 0.75)]),
         ]
         if label.isMulti {

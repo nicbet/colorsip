@@ -19,6 +19,19 @@ public struct PickerDisplay: Equatable, Sendable {
     public var pixelHeight: Int { Int((frame.height * scale).rounded()) }
 }
 
+/// An on-screen window of another app, for Smart Profiles (`spec.md` §6).
+public struct PickerWindow: Equatable, Sendable {
+    /// In global points, AppKit coordinates, like ``PickerDisplay/frame``.
+    public var frame: CGRect
+    /// The owning app's bundle ID, if it has one.
+    public var bundleID: String?
+
+    public init(frame: CGRect, bundleID: String?) {
+        self.frame = frame
+        self.bundleID = bundleID
+    }
+}
+
 /// A physical pixel of a display, with the origin at the top left and y down: the layout of a
 /// screen capture.
 public struct PixelPoint: Hashable, Sendable {
@@ -37,6 +50,12 @@ public enum PickerGeometry {
     /// displays.
     public static func display(at point: CGPoint, in displays: [PickerDisplay]) -> PickerDisplay? {
         displays.first { point.x >= $0.frame.minX && point.x < $0.frame.maxX && point.y >= $0.frame.minY && point.y < $0.frame.maxY }
+    }
+
+    /// The first window of `windows`, ordered front to back, that contains `point` (max edges
+    /// exclusive).
+    public static func window(at point: CGPoint, in windows: [PickerWindow]) -> PickerWindow? {
+        windows.first { point.x >= $0.frame.minX && point.x < $0.frame.maxX && point.y >= $0.frame.minY && point.y < $0.frame.maxY }
     }
 
     /// The pixel of `display` under `point`, clamped into the display.

@@ -21,8 +21,9 @@ struct SettingsTab: View {
         case .general: GeneralPane(model: model)
         case .shortcuts: ShortcutsPane(shortcuts: model.shortcuts)
         case .picker: PickerPane(settings: model.settings)
+        case .profiles: ProfilesPane(settings: model.settings)
         case .permissions: PermissionsPane(model: model)
-        case .profiles, .formats, .sync: EmptyView() // cs-615265, V3
+        case .formats, .sync: EmptyView() // V3
         }
     }
 }

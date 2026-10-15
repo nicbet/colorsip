@@ -57,16 +57,19 @@ public struct LoupeLayout: Equatable, Sendable {
     }
 }
 
-/// The loupe label: the value in the active format and the friendly name.
+/// The loupe label: the value in the active format, the friendly name and the profile's badge.
 public struct PickerLabel: Equatable, Sendable {
     public var value: String
     public var name: String
+    /// The profile the value was converted to (`spec.md` §6).
+    public var profile: TargetProfile
     /// Whether the next click keeps the picker open: multi mode, or Shift held.
     public var isMulti: Bool
 
-    public init(value: String, name: String, isMulti: Bool = false) {
+    public init(value: String, name: String, profile: TargetProfile, isMulti: Bool = false) {
         self.value = value
         self.name = name
+        self.profile = profile
         self.isMulti = isMulti
     }
 }
@@ -133,21 +136,24 @@ public struct PickerModeMenu: Equatable, Sendable {
     }
 }
 
-/// The state of one open picker (`spec.md` §4.2–4.4): where the pointer is, which pixels the loupe
-/// shows, the loupe size and the mode. The overlay renders it; the screen sampler fills in
-/// `samples`. Input methods return the ``PickerStep`` the caller carries out.
+/// The state of one open picker (`spec.md` §4.2–4.4, §6): where the pointer is, which pixels the
+/// loupe shows, the loupe size, the mode and the target profile. The overlay renders it; the screen
+/// sampler fills in `samples`. Input methods return the ``PickerStep`` the caller carries out.
 @MainActor
 @Observable
 public final class PickerSession {
     public let displays: [PickerDisplay]
+    /// Other apps' windows, front to back, for Smart Profiles.
+    public let windows: [PickerWindow]
+    public let profiles: SmartProfiles
     public private(set) var point: CGPoint
     public private(set) var display: PickerDisplay
     /// A session copy of the loupe size. The caller saves it when the picker closes.
     public private(set) var loupe: LoupeSettings
     /// The grid's colors, matching `grid.cells`; empty until the display's first sample.
     public private(set) var samples: [PixelSample?] = []
-    /// The center pixel's color, or `nil` until the display's first sample.
-    public private(set) var centerColor: CSipColor?
+    /// The center pixel as sampled, in Display P3, or `nil` until the display's first sample.
+    private var sampledCenter: CSipColor?
     /// Every session starts in single mode.
     public private(set) var mode = PickerMode.single
     /// Where the visible cursor is while the mode menu is open (Option held), or `nil` when closed.
@@ -163,13 +169,29 @@ public final class PickerSession {
     @ObservationIgnored private var scrollSteps = LoupeScroll()
 
     /// `optionHeld`: whether Option is down as the picker opens.
-    public init(displays: [PickerDisplay], loupe: LoupeSettings, point: CGPoint, optionHeld: Bool = false) {
+    public init(
+        displays: [PickerDisplay], loupe: LoupeSettings, point: CGPoint, windows: [PickerWindow] = [],
+        profiles: SmartProfiles = SmartProfiles(), optionHeld: Bool = false
+    ) {
         precondition(!displays.isEmpty, "The picker needs a display")
         self.displays = displays
+        self.windows = windows
+        self.profiles = profiles
         self.loupe = loupe
         self.point = point
         optionArmed = !optionHeld
         display = PickerGeometry.display(at: point, in: displays) ?? displays[0]
+    }
+
+    /// The profile of the app whose window is under the pointer, or the fallback.
+    public var profile: TargetProfile {
+        profiles.profile(forBundleID: PickerGeometry.window(at: point, in: windows)?.bundleID)
+    }
+
+    /// The center pixel's color converted to ``profile``, unclamped (`spec.md` §5.1), or `nil`
+    /// until the display's first sample.
+    public var centerColor: CSipColor? {
+        sampledCenter?.converted(to: profile.colorSpace)
     }
 
     public var pixel: PixelPoint { PickerGeometry.pixel(at: point, on: display) }
@@ -205,7 +227,7 @@ public final class PickerSession {
         if display != self.display {
             self.display = display
             samples = []
-            centerColor = nil
+            sampledCenter = nil
         }
         if point != self.point { movedSincePick = true }
         self.point = point
@@ -255,15 +277,17 @@ public final class PickerSession {
         LoupeScroll.apply(steps, option: option, to: &loupe)
     }
 
-    /// The colors read for the current `grid` and its center pixel.
+    /// The colors read for the current `grid` and its center pixel, in the capture's Display P3.
     public func sampled(_ samples: [PixelSample?], center: CSipColor?) {
         self.samples = samples
-        centerColor = center
+        sampledCenter = center
     }
 
     public func label(format: OutputFormat) -> PickerLabel? {
         centerColor.map {
-            PickerLabel(value: $0.formatted(as: format), name: $0.friendlyName, isMulti: mode == .multi || isShiftHeld)
+            PickerLabel(
+                value: $0.formatted(as: format), name: $0.friendlyName, profile: profile,
+                isMulti: mode == .multi || isShiftHeld)
         }
     }
 

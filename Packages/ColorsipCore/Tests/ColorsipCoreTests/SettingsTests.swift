@@ -29,6 +29,7 @@ struct SettingsTests {
         #expect(settings.shortcuts[.contrastChecker] == nil)
         #expect(settings.loupe.diameter == 200)
         #expect(settings.loupe.gridSize == 11)
+        #expect(settings.profiles == SmartProfiles())
     }
 
     @Test func roundTrip() throws {
@@ -38,6 +39,8 @@ struct SettingsTests {
         settings.shortcuts[.mainWindow] = KeyboardShortcut(keyCode: 46, modifiers: [.option])
         settings.loupe.diameter = 260
         settings.loupe.gridSize = 15
+        settings.profiles.fallback = .genericRGB
+        settings.profiles.removeRule(bundleID: "com.apple.Preview")
         let decoded = try JSONDecoder.library.decode(AppSettings.self, from: JSONEncoder.library.encode(settings))
         #expect(decoded == settings)
     }
@@ -73,6 +76,10 @@ struct SettingsTests {
             { "formatVersion": 1, "defaultFormat": "cmyk", "shortcuts": { "picker": 3, "teleport": null } }
             """#)
         #expect(settings == AppSettings())
+    }
+
+    @Test func unreadableProfilesFallBackToDefaults() throws {
+        #expect(try decode(#"{ "formatVersion": 1, "profiles": 3 }"#).profiles == SmartProfiles())
     }
 
     @Test func newerFormatIsRejected() {
@@ -211,12 +218,11 @@ struct LocalSettingsTests {
 
 @Suite("AppSettings panes")
 struct SettingsPaneTests {
-    @Test func mvpShowsGeneralShortcutsPickerAndPermissions() {
-        // Profiles (cs-615265) appears once its content exists.
-        #expect(SettingsPane.visible(for: .mvp) == [.general, .shortcuts, .picker, .permissions])
+    @Test func mvpShowsGeneralShortcutsPickerProfilesAndPermissions() {
+        #expect(SettingsPane.visible(for: .mvp) == [.general, .shortcuts, .picker, .profiles, .permissions])
     }
 
     @Test func v3AddsFormatsAndSync() {
-        #expect(SettingsPane.visible(for: .v3) == [.general, .shortcuts, .picker, .permissions, .formats, .sync])
+        #expect(SettingsPane.visible(for: .v3) == [.general, .shortcuts, .picker, .profiles, .permissions, .formats, .sync])
     }
 }
