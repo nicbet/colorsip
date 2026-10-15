@@ -317,6 +317,8 @@ Picks can be undone too, except their effect on Color History.
 - **Shortcuts**: the picker shortcut (MVP); contrast checker and main window shortcuts (V2).
 - **Picker**: the default loupe diameter and grid size.
 - **Profiles**: the Smart Profiles table and the fallback profile.
+- **Palettes**: optional starter collections. Tailwind CSS v4.1.18 provides 22 palettes that can
+  be added individually or all at once; palettes already in the library are shown as added.
 - **Permissions**: the status of each permission and a button to start the guide again.
 - **Formats** (V3): the Smart Formats table.
 - **Sync** (V3): the sync folder.

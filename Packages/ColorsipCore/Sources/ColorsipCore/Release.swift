@@ -56,11 +56,11 @@ public enum MainWindowTab: Sendable, CaseIterable {
 
 /// A pane of the Settings tab (`spec.md` §10).
 public enum SettingsPane: String, Sendable, CaseIterable {
-    case general, shortcuts, picker, profiles, permissions, formats, sync
+    case general, shortcuts, picker, profiles, palettes, permissions, formats, sync
 
     public var release: Release {
         switch self {
-        case .general, .shortcuts, .picker, .profiles, .permissions: .mvp
+        case .general, .shortcuts, .picker, .profiles, .palettes, .permissions: .mvp
         case .formats, .sync: .v3
         }
     }

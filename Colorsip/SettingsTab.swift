@@ -22,8 +22,85 @@ struct SettingsTab: View {
         case .shortcuts: ShortcutsPane(shortcuts: model.shortcuts)
         case .picker: PickerPane(settings: model.settings)
         case .profiles: ProfilesPane(settings: model.settings)
+        case .palettes: StarterPalettesPane(library: model.library)
         case .permissions: PermissionsPane(model: model)
         case .formats, .sync: EmptyView() // V3
+        }
+    }
+}
+
+private struct StarterPalettesPane: View {
+    let library: LibraryController
+
+    private let collection = StarterPaletteCatalog.tailwindCSSV4
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(collection.palettes) { palette in
+                    StarterPaletteRow(
+                        palette: palette,
+                        isAdded: library.library.contains(starterPalette: palette),
+                        add: { library.addStarterPalette(palette) }
+                    )
+                }
+            } header: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Starter Palettes")
+                        Text(collection.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Add All") {
+                        library.addMissingStarterPalettes(from: collection)
+                    }
+                    .disabled(missingCount == 0)
+                }
+            } footer: {
+                HStack(spacing: 4) {
+                    Text("Official Tailwind CSS colors, MIT licensed.")
+                    Link("View source", destination: collection.sourceURL)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var missingCount: Int {
+        collection.palettes.count { !library.library.contains(starterPalette: $0) }
+    }
+}
+
+private struct StarterPaletteRow: View {
+    let palette: StarterPalette
+    let isAdded: Bool
+    let add: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(palette.name)
+                .frame(width: 58, alignment: .leading)
+            HStack(spacing: 0) {
+                ForEach(palette.swatches) { swatch in
+                    Rectangle()
+                        .fill(swatch.color.swiftUIColor)
+                        .help("\(palette.name) \(swatch.name)")
+                }
+            }
+            .frame(height: 16)
+            .clipShape(.rect(cornerRadius: 4))
+            if isAdded {
+                Label("Added", systemImage: "checkmark")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 62, alignment: .leading)
+            } else {
+                Button("Add", action: add)
+                    .frame(width: 62)
+            }
         }
     }
 }
@@ -181,6 +258,7 @@ extension SettingsPane {
         case .shortcuts: "Shortcuts"
         case .picker: "Picker"
         case .profiles: "Profiles"
+        case .palettes: "Palettes"
         case .permissions: "Permissions"
         case .formats: "Formats"
         case .sync: "Sync"
@@ -193,6 +271,7 @@ extension SettingsPane {
         case .shortcuts: "command"
         case .picker: "eyedropper"
         case .profiles: "paintpalette"
+        case .palettes: "square.stack.3d.up"
         case .permissions: "lock.shield"
         case .formats: "textformat"
         case .sync: "arrow.triangle.2.circlepath"

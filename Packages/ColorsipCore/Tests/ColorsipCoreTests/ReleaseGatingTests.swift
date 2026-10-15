@@ -40,6 +40,12 @@ struct ReleaseGatingTests {
     @Test func v2MainWindowAddsLibraryFirst() {
         #expect(MainWindowTab.visible(for: .v2) == [.library, .settings])
     }
+
+    @Test func mvpSettingsIncludeStarterPalettesBeforePermissions() {
+        #expect(SettingsPane.visible(for: .mvp) == [
+            .general, .shortcuts, .picker, .profiles, .palettes, .permissions,
+        ])
+    }
 }
 
 @Suite("Output format catalogue")

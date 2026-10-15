@@ -111,3 +111,6 @@ MIT. See [`LICENSE`](LICENSE).
   `Packages/ColorsipCore/Sources/ColorsipCore/Resources/`. To update it, replace `colornames.csv`
   with the `dist/colornames.csv` of a newer `color-name-list` npm release, and update the version
   here, in `Package.swift`, and in the entry-count test.
+- Starter palette colors come from [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)
+  v4.1.18, MIT licensed. The pinned `theme.css` and Tailwind license are bundled in
+  `Packages/ColorsipCore/Sources/ColorsipCore/Resources/`.

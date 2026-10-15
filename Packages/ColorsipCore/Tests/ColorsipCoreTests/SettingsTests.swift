@@ -225,11 +225,15 @@ struct LocalSettingsTests {
 
 @Suite("AppSettings panes")
 struct SettingsPaneTests {
-    @Test func mvpShowsGeneralShortcutsPickerProfilesAndPermissions() {
-        #expect(SettingsPane.visible(for: .mvp) == [.general, .shortcuts, .picker, .profiles, .permissions])
+    @Test func mvpShowsGeneralShortcutsPickerProfilesPalettesAndPermissions() {
+        #expect(SettingsPane.visible(for: .mvp) == [
+            .general, .shortcuts, .picker, .profiles, .palettes, .permissions,
+        ])
     }
 
     @Test func v3AddsFormatsAndSync() {
-        #expect(SettingsPane.visible(for: .v3) == [.general, .shortcuts, .picker, .profiles, .permissions, .formats, .sync])
+        #expect(SettingsPane.visible(for: .v3) == [
+            .general, .shortcuts, .picker, .profiles, .palettes, .permissions, .formats, .sync,
+        ])
     }
 }

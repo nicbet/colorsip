@@ -134,6 +134,11 @@ public struct Library: Hashable, Sendable {
         palettes.first { $0.id == id }
     }
 
+    /// Whether a starter palette is installed. Stable identity deliberately survives user edits.
+    public func contains(starterPalette: StarterPalette) -> Bool {
+        palettes.contains { $0.id == starterPalette.id }
+    }
+
     // MARK: - Palettes
 
     /// Appends an empty palette and returns its id.
@@ -142,6 +147,24 @@ public struct Library: Hashable, Sendable {
         let palette = Palette(name: name, at: date)
         palettes.append(palette)
         return palette.id
+    }
+
+    /// Installs a starter palette as an ordinary editable palette. Returns false if it is present.
+    @discardableResult
+    public mutating func install(_ starterPalette: StarterPalette, at date: Date = .now) -> Bool {
+        guard !contains(starterPalette: starterPalette) else { return false }
+        palettes.append(starterPalette.makePalette(at: date))
+        return true
+    }
+
+    /// Installs the collection's missing palettes in catalogue order.
+    @discardableResult
+    public mutating func installMissing(
+        from collection: StarterPaletteCollection, at date: Date = .now
+    ) -> Int {
+        collection.palettes.reduce(into: 0) { count, palette in
+            if install(palette, at: date) { count += 1 }
+        }
     }
 
     public mutating func renamePalette(_ id: Palette.ID, to name: String, at date: Date = .now) throws(LibraryError) {

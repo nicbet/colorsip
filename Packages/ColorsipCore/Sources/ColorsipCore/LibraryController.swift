@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 /// The app's library: loaded from a ``LibraryStore`` at launch, saved after every change, undo and
@@ -27,6 +28,24 @@ public final class LibraryController {
     public var canRedo: Bool { undoable.canRedo }
     public var undoActionName: String? { undoable.undoActionName }
     public var redoActionName: String? { undoable.redoActionName }
+
+    /// Adds one starter palette as a persisted, undoable library change.
+    @discardableResult
+    public func addStarterPalette(_ palette: StarterPalette, at date: Date = .now) -> Bool {
+        perform("Add \(palette.libraryName) Starter Palette") {
+            $0.install(palette, at: date)
+        }
+    }
+
+    /// Adds every missing palette in a starter collection as one undo step.
+    @discardableResult
+    public func addMissingStarterPalettes(
+        from collection: StarterPaletteCollection, at date: Date = .now
+    ) -> Int {
+        perform("Add \(collection.name) Starter Palettes") {
+            $0.installMissing(from: collection, at: date)
+        }
+    }
 
     /// Applies `change` as one undoable step and saves it. See ``UndoableLibrary/perform(_:_:)``.
     @discardableResult
