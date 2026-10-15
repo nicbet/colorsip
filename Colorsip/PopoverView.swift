@@ -34,6 +34,7 @@ struct PopoverView: View {
         .onDisappear {
             model.drag = nil
             model.discardEditor()
+            SwatchHoverPanel.shared.hide()
         }
     }
 

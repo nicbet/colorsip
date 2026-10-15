@@ -45,6 +45,9 @@ struct PaletteListView: View {
                 .padding(.horizontal, 10)
                 .onGeometryChange(for: Double.self) { $0.size.height } action: { contentHeight = $0 }
             }
+            .onScrollGeometryChange(for: Double.self) { $0.contentOffset.y } action: { _, _ in
+                SwatchHoverPanel.shared.hide()
+            }
             .onChange(of: model.edit) { _, edit in
                 guard let edit else { return }
                 withAnimation { scroller.scrollTo(edit.palette) }
@@ -393,7 +396,7 @@ struct SwatchStrip: View {
                 ForEach(layout.sections) { section in
                     HStack(spacing: 0) {
                         ForEach(section.swatches) { swatch in
-                            cell(swatch, in: section.group)
+                            cell(swatch, in: section.group, width: layout.segmentWidth)
                                 .frame(width: layout.segmentWidth)
                         }
                     }
@@ -411,12 +414,26 @@ struct SwatchStrip: View {
         .scrollDisabled(!layout.isScrollable)
         .onScrollGeometryChange(for: Double.self) { $0.contentOffset.x + $0.contentInsets.leading } action: {
             offset = $1
+            // The label stays where it was; the next pointer move shows it on the new swatch.
+            SwatchHoverPanel.shared.hide()
         }
         .mask(fadeMask(layout.fades(offset: offset)))
         .animation(.easeOut(duration: 0.15), value: layout.fades(offset: offset))
     }
 
-    private func cell(_ swatch: Swatch, in group: SwatchGroup.ID?) -> some View {
+    /// The frame on screen of a cell of `size`, from where the pointer is in it and on screen. This
+    /// avoids looking up the window; screen coordinates have y growing upward.
+    private func screenFrame(of size: CGSize, pointerAt point: CGPoint) -> CGRect {
+        let mouse = NSEvent.mouseLocation
+        return CGRect(x: mouse.x - point.x, y: mouse.y + point.y - size.height, width: size.width, height: size.height)
+    }
+
+    /// Reads Copied while the swatch's check mark shows.
+    private func hoverLabel(_ swatch: Swatch) -> SwatchHoverLabel {
+        SwatchHoverLabel(swatch: swatch, format: format, copied: copied == swatch.id)
+    }
+
+    private func cell(_ swatch: Swatch, in group: SwatchGroup.ID?, width: Double) -> some View {
         Rectangle()
             .fill(swatch.color.swiftUIColor)
             // A checkerboard shows through translucent colors.
@@ -443,7 +460,23 @@ struct SwatchStrip: View {
             .contentShape(Rectangle())
             .onTapGesture { copyAndConfirm(swatch, as: format) }
             .swatchDrag(swatch, as: dragSource(swatch, group), model: model)
-            .help("\(swatch.name) — \(format.string(for: swatch.color))")
+            .pointerStyle(.link)
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point):
+                    guard model.drag == nil else { return SwatchHoverPanel.shared.hide() }
+                    SwatchHoverPanel.shared.show(
+                        swatch.id, label: hoverLabel(swatch),
+                        anchor: screenFrame(of: CGSize(width: width, height: stripHeight), pointerAt: point))
+                case .ended:
+                    SwatchHoverPanel.shared.exit(swatch.id)
+                }
+            }
+            .onChange(of: hoverLabel(swatch)) { _, label in SwatchHoverPanel.shared.update(swatch.id, label: label) }
+            .onDisappear { SwatchHoverPanel.shared.exit(swatch.id) }
+            .accessibilityElement()
+            .accessibilityLabel(SwatchHoverLabel(swatch: swatch, format: format).text)
+            .accessibilityAddTraits(.isButton)
             .contextMenu {
                 Menu("Copy as") {
                     ForEach(OutputFormat.allCases) { format in
