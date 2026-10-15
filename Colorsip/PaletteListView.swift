@@ -265,14 +265,16 @@ struct PaletteRow: View {
         }
     }
 
-    /// The swatch menu items after Copy as: Rename…, Delete and the group's submenu.
+    /// The swatch menu items after Copy as: Edit…, Rename…, Delete and the group's submenu.
     @ViewBuilder private func swatchMenu(_ swatch: Swatch, in groupID: SwatchGroup.ID?) -> some View {
         let section = groupID.map { SectionID.group($0, in: palette.id) } ?? .ungrouped(palette.id)
         ForEach(SwatchMenuItem.items(in: groupID, of: palette), id: \.self) { item in
             switch item {
             case .copyAs: EmptyView() // drawn by the strip
-            case .rename:
+            case .edit:
                 Divider()
+                Button("Edit…") { model.openEditor(swatch, in: section) }
+            case .rename:
                 Button("Rename…") { model.edit = .renameSwatch(swatch.id, in: section) }
             case .delete: Button("Delete", role: .destructive) { library.deleteSwatch(swatch.id, in: section) }
             case .group:
@@ -417,6 +419,10 @@ struct SwatchStrip: View {
     private func cell(_ swatch: Swatch, in group: SwatchGroup.ID?) -> some View {
         Rectangle()
             .fill(swatch.color.swiftUIColor)
+            // A checkerboard shows through translucent colors.
+            .background {
+                if swatch.color.alpha < 1 { Checkerboard() }
+            }
             .overlay {
                 if copied == swatch.id {
                     Image(systemName: "checkmark")

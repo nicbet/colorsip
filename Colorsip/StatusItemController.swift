@@ -17,6 +17,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
         let actions = PopoverActions(
             picker: closing(actions.picker),
+            repick: closing(actions.repick),
             newPalette: actions.newPalette,
             settings: closing(actions.settings),
             quit: actions.quit
@@ -41,12 +42,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
-            // An agent app has to be active for the transient popover to take key and close on
-            // outside clicks.
-            NSApp.activate()
-            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-            installBackground()
+            showPopover()
         }
+    }
+
+    func showPopover() {
+        guard !popover.isShown, let button = statusItem.button else { return }
+        // An agent app has to be active for the transient popover to take key and close on outside
+        // clicks.
+        NSApp.activate()
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        installBackground()
     }
 
     /// Puts the popover background behind the popover's frame view, so it fills the arrow too. A

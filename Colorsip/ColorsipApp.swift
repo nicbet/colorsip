@@ -52,12 +52,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .contrastChecker, .mainWindow: break // V2
             }
         }
-        statusItem = StatusItemController(model: model, actions: PopoverActions(
+        let statusItem = StatusItemController(model: model, actions: PopoverActions(
             picker: picker,
+            repick: { [model] in
+                guard permissionsGuide.require(.screenRecording) else {
+                    model.endRepick(nil)
+                    model.discardEditor()
+                    return
+                }
+                pickerController.open { [weak self] color in
+                    model.endRepick(color)
+                    self?.statusItem?.showPopover()
+                }
+            },
             newPalette: { [model] in model.newPalette() },
             settings: { mainWindow.show(.settings) },
             quit: { NSApp.terminate(nil) }
         ))
+        self.statusItem = statusItem
         permissionsGuide.checkAtLaunch()
     }
 }

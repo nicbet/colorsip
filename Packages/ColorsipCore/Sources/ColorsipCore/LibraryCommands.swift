@@ -135,6 +135,38 @@ extension LibraryController {
         }
     }
 
+    /// Applies the color editor's changes as one step, "Edit Color". An empty name keeps the old
+    /// name; an empty description clears it.
+    @discardableResult
+    public func editSwatch(
+        _ id: Swatch.ID, in section: SectionID, color: CSipColor, name: String, description: String?,
+        at date: Date = .now
+    ) -> SwatchEditResult {
+        guard let swatch = library.palette(section.palette)?.swatches(in: section.group)?.first(where: { $0.id == id })
+        else { return .failed }
+        let before = library
+        do {
+            try perform("Edit Color") { library throws(LibraryError) in
+                try library.editSwatch(
+                    id, in: section, color: color, name: name.trimmedNonEmpty ?? swatch.name,
+                    description: description?.trimmedNonEmpty, at: date)
+            }
+        } catch .duplicate(let existing) {
+            return .duplicate(existing: existing)
+        } catch {
+            return .failed
+        }
+        return library == before ? .unchanged : .changed
+    }
+
+    /// Saves the color editor's draft. See ``editSwatch(_:in:color:name:description:at:)``.
+    @discardableResult
+    public func save(_ editor: ColorEditor, in section: SectionID, at date: Date = .now) -> SwatchEditResult {
+        editSwatch(
+            editor.original.id, in: section, color: editor.color, name: editor.name,
+            description: editor.description, at: date)
+    }
+
     @discardableResult
     public func deleteSwatch(_ id: Swatch.ID, in section: SectionID, at date: Date = .now) -> Bool {
         attempt("Delete Swatch") { library throws(LibraryError) in try library.deleteSwatch(id, in: section, at: date) }
@@ -148,6 +180,17 @@ extension LibraryController {
         do { try perform(actionName, change) } catch { return false }
         return library != before
     }
+}
+
+/// What saving a color edit did.
+public enum SwatchEditResult: Hashable, Sendable {
+    case changed
+    /// Nothing differed, so no undo step was recorded.
+    case unchanged
+    /// The section already has the color (`spec.md` §7.2).
+    case duplicate(existing: Swatch.ID)
+    /// The swatch is gone or its palette is locked.
+    case failed
 }
 
 extension String {

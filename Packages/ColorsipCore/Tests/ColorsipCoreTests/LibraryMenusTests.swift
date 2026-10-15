@@ -48,8 +48,8 @@ struct LibraryMenusTests {
     @Test func swatchMenu() throws {
         var (library, palette, g) = try sampleLibrary()
         let p = try #require(library.palette(palette))
-        #expect(SwatchMenuItem.items(in: nil, of: p) == [.copyAs, .rename, .delete])
-        #expect(SwatchMenuItem.items(in: g, of: p) == [.copyAs, .rename, .delete, .group])
+        #expect(SwatchMenuItem.items(in: nil, of: p) == [.copyAs, .edit, .rename, .delete])
+        #expect(SwatchMenuItem.items(in: g, of: p) == [.copyAs, .edit, .rename, .delete, .group])
         // Color History
         #expect(SwatchMenuItem.items(in: nil, of: nil) == [.copyAs])
         try library.setLocked(true, palette: palette, at: t0)

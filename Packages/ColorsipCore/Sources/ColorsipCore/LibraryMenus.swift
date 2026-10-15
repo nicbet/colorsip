@@ -25,10 +25,9 @@ public enum GroupMenuItem: Hashable, Sendable {
     }
 }
 
-/// The items of a swatch's context menu (`spec.md` §3.1), in order. Edit… arrives with the color
-/// editor (cs-722793).
+/// The items of a swatch's context menu (`spec.md` §3.1), in order.
 public enum SwatchMenuItem: Hashable, Sendable {
-    case copyAs, rename, delete
+    case copyAs, edit, rename, delete
     /// The submenu of the swatch's group.
     case group
 
@@ -36,7 +35,7 @@ public enum SwatchMenuItem: Hashable, Sendable {
     /// History passes `nil` for the palette. Only Copy as is offered there and in locked palettes.
     public static func items(in group: SwatchGroup.ID?, of palette: Palette?) -> [SwatchMenuItem] {
         guard let palette, !palette.isLocked else { return [.copyAs] }
-        return [.copyAs, .rename, .delete] + (group == nil ? [] : [.group])
+        return [.copyAs, .edit, .rename, .delete] + (group == nil ? [] : [.group])
     }
 }
 

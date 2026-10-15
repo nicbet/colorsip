@@ -7,6 +7,9 @@ import ColorsipCore
 final class PickerController {
     /// Called for every pick, as it is made; a multi session calls it several times.
     var onPick: @MainActor (CSipColor) -> Void = { _ in }
+    /// Set while the color editor's eyedropper picks: it gets the first pick, or `nil` if the
+    /// picker closes without one, instead of `onPick`.
+    private var repick: (@MainActor (CSipColor?) -> Void)?
 
     private let model: AppModel
     private var session: PickerSession?
@@ -22,6 +25,15 @@ final class PickerController {
     }
 
     var isOpen: Bool { session != nil }
+
+    /// Opens the picker for the color editor's eyedropper (`spec.md` §5.4): the first pick goes to
+    /// `completion` and closes the picker. It isn't routed like other picks.
+    func open(repick completion: @escaping @MainActor (CSipColor?) -> Void) {
+        guard session == nil else { return completion(nil) }
+        repick = completion
+        open()
+        if session == nil { finishRepick(nil) }
+    }
 
     func open() {
         guard session == nil else { return }
@@ -123,6 +135,9 @@ final class PickerController {
 
     private func perform(_ step: PickerStep) {
         switch step {
+        case .pick(let color, _) where repick != nil:
+            finishRepick(color)
+            close()
         case .pick(let color, let close):
             onPick(color)
             if close { self.close() } else { resample() }
@@ -185,8 +200,16 @@ final class PickerController {
 
     // MARK: Closing
 
-    /// Closes the picker. Picks were already reported as they were made.
+    private func finishRepick(_ color: CSipColor?) {
+        let completion = repick
+        repick = nil
+        completion?(color)
+    }
+
+    /// Closes the picker. Picks were already reported as they were made; a re-pick that closes
+    /// without a pick reports `nil`.
     private func close() {
+        defer { finishRepick(nil) }
         guard let session else { return }
         self.session = nil
         sampler.stop()

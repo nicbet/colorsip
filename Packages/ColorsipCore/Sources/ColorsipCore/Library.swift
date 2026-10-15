@@ -300,13 +300,13 @@ public struct Library: Hashable, Sendable {
     public mutating func renameSwatch(
         _ id: Swatch.ID, in section: SectionID, to name: String, at date: Date = .now
     ) throws(LibraryError) {
-        try editSwatch(id, in: section, at: date) { $0.name = name }
+        try modifySwatch(id, in: section, at: date) { $0.name = name }
     }
 
     public mutating func setSwatchDescription(
         _ description: String?, of id: Swatch.ID, in section: SectionID, at date: Date = .now
     ) throws(LibraryError) {
-        try editSwatch(id, in: section, at: date) { $0.description = description }
+        try modifySwatch(id, in: section, at: date) { $0.description = description }
     }
 
     /// Changes a swatch's color. Throws `.duplicate` if another swatch in the section has that color.
@@ -322,6 +322,23 @@ public struct Library: Hashable, Sendable {
                 swatches[i].color = color
                 swatches[i].modifiedAt = date.libraryTimestamp
             }
+        }
+    }
+
+    /// Changes a swatch's color, name and description at once (the color editor's Done). Throws
+    /// `.duplicate` if another swatch in the section has that color.
+    public mutating func editSwatch(
+        _ id: Swatch.ID, in section: SectionID, color: CSipColor, name: String, description: String?,
+        at date: Date = .now
+    ) throws(LibraryError) {
+        guard let palette = palette(section.palette), let swatches = palette.swatches(in: section.group)
+        else { throw .notFound }
+        guard !palette.isLocked else { throw .locked(palette.id) }
+        if let existing = swatches.duplicate(of: color, excluding: id) { throw .duplicate(existing: existing.id) }
+        try modifySwatch(id, in: section, at: date) { swatch in
+            swatch.color = color
+            swatch.name = name
+            swatch.description = description
         }
     }
 
@@ -400,7 +417,7 @@ public struct Library: Hashable, Sendable {
         return result
     }
 
-    private mutating func editSwatch(
+    private mutating func modifySwatch(
         _ id: Swatch.ID, in section: SectionID, at date: Date, _ change: (inout Swatch) -> Void
     ) throws(LibraryError) {
         try editPalette(section.palette, at: date) { p throws(LibraryError) in

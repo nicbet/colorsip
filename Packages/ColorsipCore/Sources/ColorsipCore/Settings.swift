@@ -198,6 +198,12 @@ public struct LocalSettings {
         nonmutating set { defaults.set(newValue.rawValue, forKey: "settingsPane") }
     }
 
+    /// The color editor's model switcher choice.
+    public var editorModel: EditorModel {
+        get { defaults.string(forKey: "editorModel").flatMap(EditorModel.init(rawValue:)) ?? .hex }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: "editorModel") }
+    }
+
     /// Permissions the user skipped in the onboarding guide; the launch check leaves them out.
     public var skippedPermissions: Set<Permission> {
         get { Set((defaults.stringArray(forKey: "skippedPermissions") ?? []).compactMap(Permission.init(rawValue:))) }

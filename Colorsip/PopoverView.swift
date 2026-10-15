@@ -3,6 +3,8 @@ import SwiftUI
 
 struct PopoverActions {
     var picker: @MainActor () -> Void
+    /// The color editor's eyedropper.
+    var repick: @MainActor () -> Void
     var newPalette: @MainActor () -> Void
     var settings: @MainActor () -> Void
     var quit: @MainActor () -> Void
@@ -14,6 +16,28 @@ struct PopoverView: View {
     let actions: PopoverActions
 
     var body: some View {
+        Group {
+            // The color editor takes the popover over, like a sheet, until Done or Cancel.
+            if model.colorEditor != nil {
+                ColorEditorView(model: model, repick: actions.repick)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                content
+                    .background { undoRedoKeys }
+            }
+        }
+        .frame(width: 320)
+        .animation(.easeOut(duration: 0.2), value: model.colorEditor == nil)
+        .onChange(of: model.library.library) { model.closeEditorIfSwatchIsGone() }
+        // The drag session clears the drag when it ends; closing the popover does too, in case it
+        // closes mid-drag. Closing it also discards the color editor's draft.
+        .onDisappear {
+            model.drag = nil
+            model.discardEditor()
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             HStack {
                 ForEach(PopoverItem.toolbar(for: .current), id: \.self, content: button)
@@ -31,11 +55,6 @@ struct PopoverView: View {
             }
             .padding(10)
         }
-        .frame(width: 320)
-        .background { undoRedoKeys }
-        // The drag session clears the drag when it ends; closing the popover does too, in case it
-        // closes mid-drag.
-        .onDisappear { model.drag = nil }
     }
 
     /// Cmd+Z and Shift+Cmd+Z for library changes (`spec.md` §7.6), as invisible buttons so their key

@@ -20,6 +20,10 @@ final class AppModel {
     var settingsPane: SettingsPane {
         didSet { localSettings.settingsPane = settingsPane }
     }
+    /// The color editor's model switcher choice, remembered on this Mac.
+    var editorModel: EditorModel {
+        didSet { localSettings.editorModel = editorModel }
+    }
 
     @ObservationIgnored private let localSettings: LocalSettings
 
@@ -45,6 +49,7 @@ final class AppModel {
         self.localSettings = localSettings
         let pane = localSettings.settingsPane
         settingsPane = SettingsPane.visible(for: .current).contains(pane) ? pane : .general
+        editorModel = localSettings.editorModel
     }
 
     /// Copies `color` in `format`, or in the active format.
@@ -82,6 +87,54 @@ final class AppModel {
         }
     }
 
+    // MARK: - Color editor (`spec.md` §5.4)
+
+    /// The color editor, while it's open in the popover.
+    var colorEditor: ColorEditorSession?
+    /// Whether the editor's eyedropper is picking. Closing the popover keeps the editor meanwhile.
+    private(set) var isRepicking = false
+
+    func openEditor(_ swatch: Swatch, in section: SectionID) {
+        edit = nil
+        colorEditor = ColorEditorSession(editor: ColorEditor(swatch: swatch), section: section)
+    }
+
+    /// Saves the draft as one undoable step and closes the editor. A color the section already has
+    /// keeps the editor open and names the swatch that has it.
+    func saveEditor() {
+        guard let session = colorEditor else { return }
+        switch library.save(session.editor, in: session.section) {
+        case .changed, .unchanged, .failed:
+            colorEditor = nil
+        case .duplicate(let existing):
+            let swatches = library.library.palette(session.section.palette)?.swatches(in: session.section.group)
+            colorEditor?.duplicateName = swatches?.first { $0.id == existing }?.name ?? ""
+        }
+    }
+
+    /// Closes the editor without saving, unless its eyedropper is picking.
+    func discardEditor() {
+        guard !isRepicking else { return }
+        colorEditor = nil
+    }
+
+    func startRepick() {
+        isRepicking = true
+    }
+
+    /// Ends the eyedropper's pick: `color` replaces the draft's color, or `nil` if it was cancelled.
+    func endRepick(_ color: CSipColor?) {
+        isRepicking = false
+        if let color { colorEditor?.editor.setPicked(color) }
+    }
+
+    /// Closes the editor if its swatch is gone, for example after an undo.
+    func closeEditorIfSwatchIsGone() {
+        guard let session = colorEditor else { return }
+        let swatches = library.library.palette(session.section.palette)?.swatches(in: session.section.group)
+        if swatches?.contains(where: { $0.id == session.editor.original.id }) != true { colorEditor = nil }
+    }
+
     private func highlight(_ swatch: Swatch.ID) {
         highlightedSwatch = swatch
         Task {
@@ -89,6 +142,14 @@ final class AppModel {
             if highlightedSwatch == swatch { highlightedSwatch = nil }
         }
     }
+}
+
+/// The color editor's draft and the section of the swatch it edits.
+struct ColorEditorSession {
+    var editor: ColorEditor
+    let section: SectionID
+    /// The name of the swatch that already has the color, after Done was refused.
+    var duplicateName: String?
 }
 
 /// An edit in progress in the popover: the small popover anchored to a palette row shows it.
