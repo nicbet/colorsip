@@ -45,10 +45,47 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             // outside clicks.
             NSApp.activate()
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            installBackground()
         }
+    }
+
+    /// Puts the popover background behind the popover's frame view, so it fills the arrow too. A
+    /// SwiftUI background would leave the arrow in the system material.
+    private func installBackground() {
+        guard let frameView = popover.contentViewController?.view.window?.contentView?.superview,
+              !frameView.subviews.contains(where: { $0 is PopoverBackgroundView })
+        else { return }
+        let background = PopoverBackgroundView(frame: frameView.bounds)
+        background.autoresizingMask = [.width, .height]
+        frameView.addSubview(background, positioned: .below, relativeTo: nil)
     }
 
     func popoverShouldDetach(_ popover: NSPopover) -> Bool {
         false
+    }
+}
+
+/// Fills the popover with #E5E7E9 in light mode. Dark mode keeps the system material, so it draws
+/// nothing there.
+private final class PopoverBackgroundView: NSView {
+    private static let color = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? .clear
+            : NSColor(srgbRed: 0xE5 / 255.0, green: 0xE7 / 255.0, blue: 0xE9 / 255.0, alpha: 1)
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = Self.color.cgColor
+        }
     }
 }

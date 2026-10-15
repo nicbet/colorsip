@@ -1,11 +1,11 @@
 /// The geometry of a palette's swatch strip (`spec.md` §7.3), in points.
 ///
-/// Segments have a fixed width, so 16 swatches fill the strip. The ungrouped section and each group
-/// are drawn as their own section, separated by ``groupGap``; empty sections are left out. Content
-/// wider than the strip scrolls horizontally.
+/// Up to 16 swatches spread out to fill the strip. Beyond that each segment is 1/16 of the width and
+/// the strip scrolls horizontally. The ungrouped section and each group are drawn as their own
+/// section, separated by ``groupGap``; empty sections are left out.
 public struct SwatchStripLayout: Sendable, Equatable {
     public static let swatchesAcross = 16
-    public static let groupGap = 4.0
+    public static let groupGap = 6.0
     /// How far from an end the scroll offset can be and still count as at that end.
     static let fadeTolerance = 0.5
 
@@ -51,7 +51,16 @@ public struct SwatchStripLayout: Sendable, Equatable {
 
     private init(runs: [(SwatchGroup.ID?, [Swatch])], width: Double) {
         let width = max(width, 0)
-        let segmentWidth = width / Double(Self.swatchesAcross)
+        let filled = runs.filter { !$0.1.isEmpty }
+        let count = filled.reduce(0) { $0 + $1.1.count }
+        let segmentWidth: Double
+        if count > 0 && count <= Self.swatchesAcross {
+            // Few enough to spread out: the segments share what the gaps leave.
+            let gaps = Double(filled.count - 1) * Self.groupGap
+            segmentWidth = max(width - gaps, 0) / Double(count)
+        } else {
+            segmentWidth = width / Double(Self.swatchesAcross)
+        }
         var sections: [Section] = []
         var x = 0.0
         for (group, swatches) in runs where !swatches.isEmpty {

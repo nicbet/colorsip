@@ -245,9 +245,9 @@ reduction.
 ### 7.3 Swatch strip (preview)
 - Swatches appear as equal-width segments. Each group is drawn as its own rounded segment, with a
   small gap between groups.
-- Segment width is fixed, so 16 swatches fill the popover width.
-- Over 16 colors, the strip **scrolls horizontally**, and its edges **fade** when there is more
-  content in that direction.
+- With 16 colors or fewer, the segments spread out evenly to fill the strip's width.
+- Over 16 colors, each segment is 1/16 of the width, so the strip **scrolls horizontally**. Its
+  edges **fade** when there is more content in that direction.
 
 ### 7.4 Color History
 - Holds the **last 16 picked colors**, newest first.

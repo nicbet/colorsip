@@ -2,13 +2,6 @@ import Foundation
 import Testing
 @testable import ColorsipCore
 
-/// A fresh temporary library folder.
-private struct TempLibrary {
-    let root = FileManager.default.temporaryDirectory.appending(path: "ColorsipTests-\(UUID().uuidString)")
-    var store: LibraryStore { LibraryStore(folder: root.appending(path: "Library")) }
-    func cleanUp() { try? FileManager.default.removeItem(at: root) }
-}
-
 private let date = Date(timeIntervalSince1970: 1_700_000_000)
 
 @MainActor

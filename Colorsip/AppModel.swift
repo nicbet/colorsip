@@ -15,6 +15,8 @@ final class AppModel {
     /// Opens the permissions guide on every missing permission; set by `AppDelegate`.
     @ObservationIgnored var startPermissionsGuide: @MainActor () -> Void = {}
     var mainWindowTab: MainWindowTab = .settings
+    /// The palette, group or swatch edit shown in the popover, if any.
+    var edit: LibraryEdit?
     var settingsPane: SettingsPane {
         didSet { localSettings.settingsPane = settingsPane }
     }
@@ -55,9 +57,32 @@ final class AppModel {
         history.record(color, name: color.friendlyName)
     }
 
-    /// Makes `palette` the pick target. The radio button is only shown on unlocked palettes, so this
-    /// doesn't fail in practice; if it does, nothing changes.
-    func setPickTarget(_ palette: Palette.ID) {
-        try? library.perform("Set Pick Target") { library throws(LibraryError) in try library.setPickTarget(palette) }
+    /// Creates a palette and opens its Rename popover.
+    func newPalette() {
+        edit = .renamePalette(library.newPalette())
+    }
+}
+
+/// An edit in progress in the popover: the small popover anchored to a palette row shows it.
+enum LibraryEdit: Hashable, Identifiable {
+    case renamePalette(Palette.ID)
+    case editDescription(Palette.ID)
+    case setIcon(Palette.ID)
+    case confirmDeletePalette(Palette.ID)
+    case renameGroup(SwatchGroup.ID, in: Palette.ID)
+    case deleteGroup(SwatchGroup.ID, in: Palette.ID)
+    case renameSwatch(Swatch.ID, in: SectionID)
+
+    var id: Self { self }
+
+    /// The palette whose row the edit is anchored to.
+    var palette: Palette.ID {
+        switch self {
+        case .renamePalette(let p), .editDescription(let p), .setIcon(let p), .confirmDeletePalette(let p),
+             .renameGroup(_, let p), .deleteGroup(_, let p):
+            p
+        case .renameSwatch(_, let section):
+            section.palette
+        }
     }
 }

@@ -1,5 +1,13 @@
+import Foundation
 import Testing
 @testable import ColorsipCore
+
+/// A fresh temporary library folder.
+struct TempLibrary {
+    let root = FileManager.default.temporaryDirectory.appending(path: "ColorsipTests-\(UUID().uuidString)")
+    var store: LibraryStore { LibraryStore(folder: root.appending(path: "Library")) }
+    func cleanUp() { try? FileManager.default.removeItem(at: root) }
+}
 
 /// Whether two component triples match within `tolerance`. The hue positions of `space` are
 /// compared modulo 360.

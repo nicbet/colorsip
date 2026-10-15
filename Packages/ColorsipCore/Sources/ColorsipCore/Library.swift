@@ -194,6 +194,32 @@ public struct Library: Hashable, Sendable {
         palettes.insert(contentsOf: moving, at: min(max(insertion, 0), palettes.count))
     }
 
+    /// Moves a palette so it ends up right before `target`, or at the end with `nil`. Unknown ids
+    /// change nothing.
+    public mutating func movePalette(_ id: Palette.ID, before target: Palette.ID?) {
+        guard let source = palettes.firstIndex(where: { $0.id == id }), id != target else { return }
+        let destination: Int
+        if let target {
+            guard let i = palettes.firstIndex(where: { $0.id == target }) else { return }
+            destination = i
+        } else {
+            destination = palettes.count
+        }
+        movePalettes(fromOffsets: [source], toOffset: destination)
+    }
+
+    /// `base`, or "base 2", "base 3", …: the first that isn't in `names`, compared case-insensitively.
+    static func uniqueName(_ base: String, among names: some Sequence<String>) -> String {
+        let taken = Set(names.map { $0.lowercased() })
+        var candidate = base
+        var n = 1
+        while taken.contains(candidate.lowercased()) {
+            n += 1
+            candidate = "\(base) \(n)"
+        }
+        return candidate
+    }
+
     /// Sets the pick target, or clears it with `nil`. A locked palette can't be the target.
     public mutating func setPickTarget(_ id: Palette.ID?) throws(LibraryError) {
         guard let id else { pickTarget = nil; return }
@@ -354,7 +380,7 @@ public struct Library: Hashable, Sendable {
     }
 
     /// Applies `change` to a copy of an unlocked palette, stamps its `modifiedAt` and stores it.
-    /// Nothing is stored if `change` throws.
+    /// Nothing is stored if `change` throws or leaves the palette as it was.
     @discardableResult
     private mutating func editPalette<T>(
         _ id: Palette.ID, at date: Date, _ change: (inout Palette) throws(LibraryError) -> T
@@ -363,6 +389,7 @@ public struct Library: Hashable, Sendable {
         guard !palettes[i].isLocked else { throw .locked(id) }
         var palette = palettes[i]
         let result = try change(&palette)
+        guard palette != palettes[i] else { return result }
         palette.modifiedAt = date.libraryTimestamp
         palettes[i] = palette
         return result
@@ -374,8 +401,9 @@ public struct Library: Hashable, Sendable {
         try editPalette(section.palette, at: date) { p throws(LibraryError) in
             try p.modifySection(section.group) { swatches throws(LibraryError) in
                 let i = try swatches.index(of: id)
+                let original = swatches[i]
                 change(&swatches[i])
-                swatches[i].modifiedAt = date.libraryTimestamp
+                if swatches[i] != original { swatches[i].modifiedAt = date.libraryTimestamp }
             }
         }
     }

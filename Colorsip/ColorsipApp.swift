@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem = StatusItemController(model: model, actions: PopoverActions(
             picker: picker,
-            newPalette: {}, // cs-d6bd2c
+            newPalette: { [model] in model.newPalette() },
             settings: { mainWindow.show(.settings) },
             quit: { NSApp.terminate(nil) }
         ))

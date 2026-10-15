@@ -24,16 +24,31 @@ struct PopoverView: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 10)
 
-            Divider()
             PaletteListView(model: model)
-            Divider()
 
             HStack {
                 ForEach(PopoverItem.bottomBar(for: .current), id: \.self, content: button)
             }
             .padding(10)
         }
-        .frame(width: 320, height: 420)
+        .frame(width: 320)
+        .background { undoRedoKeys }
+    }
+
+    /// Cmd+Z and Shift+Cmd+Z for library changes (`spec.md` §7.6), as invisible buttons so their key
+    /// equivalents work while the popover is key.
+    private var undoRedoKeys: some View {
+        ZStack {
+            Button("Undo") { model.library.undo() }
+                .keyboardShortcut("z")
+                .disabled(!model.library.canUndo)
+            Button("Redo") { model.library.redo() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(!model.library.canRedo)
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     /// The active output format: a quiet rounded field with a small chevron instead of the stock

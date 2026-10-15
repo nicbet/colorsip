@@ -27,30 +27,44 @@ struct SwatchStripLayoutTests {
         #expect(layout.fades(offset: 0) == .init(leading: false, trailing: false))
     }
 
-    @Test func segmentWidthIsFixedForFewSwatches() {
-        let layout = SwatchStripLayout(palette: palette(ungrouped: 3), width: 320)
-        #expect(layout.segmentWidth == 20)
-        #expect(layout.contentWidth == 60)
+    @Test func fewSwatchesSpreadToFillTheWidth() {
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 4), width: 320)
+        #expect(layout.segmentWidth == 80)
+        #expect(layout.contentWidth == 320)
+        #expect(!layout.isScrollable)
         #expect(layout.sections.count == 1)
         #expect(layout.sections[0].x == 0)
-        #expect(layout.sections[0].width == 60)
+        #expect(layout.sections[0].width == 320)
+    }
+
+    @Test func oneSwatchFillsTheStrip() {
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 1), width: 320)
+        #expect(layout.segmentWidth == 320)
+        #expect(layout.contentWidth == 320)
+    }
+
+    @Test func groupGapIsSixPoints() {
+        #expect(SwatchStripLayout.groupGap == 6)
     }
 
     @Test func groupsAreSeparateSectionsWithAGap() {
         let p = palette(ungrouped: 2, groups: [3, 1])
-        let layout = SwatchStripLayout(palette: p, width: 320)
+        let layout = SwatchStripLayout(palette: p, width: 324)
         let gap = SwatchStripLayout.groupGap
         #expect(layout.sections.map(\.group) == [nil, p.groups[0].id, p.groups[1].id])
-        #expect(layout.sections.map(\.x) == [0, 40 + gap, 100 + 2 * gap])
-        #expect(layout.sections.map(\.width) == [40, 60, 20])
+        // 6 swatches share the width left after two gaps: (324 - 12) / 6 = 52.
+        #expect(layout.segmentWidth == 52)
+        #expect(layout.sections.map(\.x) == [0, 104 + gap, 260 + 2 * gap])
+        #expect(layout.sections.map(\.width) == [104, 156, 52])
         #expect(layout.sections.map(\.swatches.count) == [2, 3, 1])
-        #expect(layout.contentWidth == 120 + 2 * gap)
+        #expect(layout.contentWidth == 324)
     }
 
     @Test func swatchFramesFollowEachOther() {
-        let layout = SwatchStripLayout(palette: palette(ungrouped: 1, groups: [2]), width: 320)
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 2, groups: [2]), width: 326)
         let gap = SwatchStripLayout.groupGap
-        #expect(layout.sections[1].swatchX(1) == 20 + gap + 20)
+        #expect(layout.segmentWidth == 80)
+        #expect(layout.sections[1].swatchX(1) == 160 + gap + 80)
     }
 
     @Test func emptySectionsAreLeftOut() {
@@ -58,7 +72,8 @@ struct SwatchStripLayoutTests {
         let layout = SwatchStripLayout(palette: p, width: 320)
         #expect(layout.sections.map(\.group) == [p.groups[1].id])
         #expect(layout.sections[0].x == 0)
-        #expect(layout.contentWidth == 40)
+        #expect(layout.segmentWidth == 160)
+        #expect(layout.contentWidth == 320)
     }
 
     @Test func paletteWithoutSwatchesIsEmpty() {
@@ -74,7 +89,7 @@ struct SwatchStripLayoutTests {
         #expect(layout.sections.count == 1)
         #expect(layout.sections[0].group == nil)
         #expect(layout.sections[0].swatches.count == 3)
-        #expect(layout.contentWidth == 60)
+        #expect(layout.contentWidth == 320)
         #expect(SwatchStripLayout(swatches: [], width: 320).isEmpty)
     }
 
@@ -84,10 +99,24 @@ struct SwatchStripLayoutTests {
         #expect(layout.isScrollable)
     }
 
-    @Test func sixteenSwatchesInTwoGroupsScrollByTheGap() {
-        let layout = SwatchStripLayout(palette: palette(ungrouped: 0, groups: [8, 8]), width: 320)
-        #expect(layout.contentWidth == 320 + SwatchStripLayout.groupGap)
+    @Test func sixteenSwatchesInTwoGroupsFitWithoutScrolling() {
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 0, groups: [8, 8]), width: 326)
+        #expect(layout.segmentWidth == 20)
+        #expect(layout.contentWidth == 326)
+        #expect(!layout.isScrollable)
+    }
+
+    @Test func overSixteenAcrossGroupsUseTheFixedWidth() {
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 9, groups: [8]), width: 320)
+        #expect(layout.segmentWidth == 20)
+        #expect(layout.contentWidth == 340 + SwatchStripLayout.groupGap)
         #expect(layout.isScrollable)
+    }
+
+    @Test func gapsWiderThanTheStripGiveZeroWidthSegments() {
+        let layout = SwatchStripLayout(palette: palette(ungrouped: 1, groups: [1, 1]), width: 5)
+        #expect(layout.segmentWidth == 0)
+        #expect(layout.sections.allSatisfy { $0.width == 0 })
     }
 
     @Test func fadesShowWhereThereIsMoreContent() {
