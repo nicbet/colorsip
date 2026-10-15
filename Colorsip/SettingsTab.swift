@@ -81,6 +81,7 @@ private struct GeneralPane: View {
                 Picker("Default format", selection: $model.outputFormat) {
                     ForEach(OutputFormat.allCases) { Text($0.displayName).tag($0) }
                 }
+                Toggle("Play sound effects", isOn: $model.soundEffectsEnabled)
             }
             if let message = settingsMessage {
                 Section { note(message, isError: true) }

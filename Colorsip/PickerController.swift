@@ -170,6 +170,7 @@ final class PickerController {
     }
 
     private func perform(_ step: PickerStep) {
+        model.sounds.play(for: step)
         switch step {
         case .pick(let color, _, _) where repick != nil:
             finishRepick(color)

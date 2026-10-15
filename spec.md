@@ -63,6 +63,7 @@ From top to bottom:
 
 Swatch interactions in the popover (MVP):
 - **Click** a swatch: copies its value in the active format.
+- Click-to-copy and Copy as… play a short "plopp" sound (Settings ▸ General can turn sounds off).
 - **Right-click** a swatch: Copy as… (any format), Edit…, Rename, Delete. Edit, Rename and Delete
   are hidden in locked palettes and in Color History.
 - **Right-click** a palette: Rename, Edit description, Set icon, Lock/Unlock, New group, Duplicate,
@@ -142,6 +143,10 @@ The Option popover menu switches between modes:
   re-activates that app, puts the value on the clipboard and sends a synthetic Cmd+V (CGEvent).
   This needs the Accessibility permission. If the permission is missing, the value is only copied,
   and the user is pointed to the onboarding step (§9).
+- **Sounds**: a pick that closes the picker (single pick, Cmd+click paste, the color editor's
+  eyedropper) plays a "slurp"; a pick that keeps it open (Shift+click, multi mode) plays a
+  shorter pick sound. Esc is silent. A repeated sound restarts instead of queueing. Settings ▸
+  General can turn sounds off.
 
 ## 5. Colors
 
@@ -308,7 +313,7 @@ Picks can be undone too, except their effect on Color History.
   start the guide again.
 
 ## 10. Settings — MVP
-- **General**: launch at login, default output format, quit.
+- **General**: launch at login, default output format, play sound effects (on by default), quit.
 - **Shortcuts**: the picker shortcut (MVP); contrast checker and main window shortcuts (V2).
 - **Picker**: the default loupe diameter and grid size.
 - **Profiles**: the Smart Profiles table and the fallback profile.

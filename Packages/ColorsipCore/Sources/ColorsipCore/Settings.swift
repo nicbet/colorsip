@@ -9,7 +9,8 @@ import Observation
 ///   "defaultFormat": "cssHex",
 ///   "shortcuts": { "picker": { "keyCode": 35, "modifiers": ["command", "control", "option"] } },
 ///   "loupe": { "diameter": 200, "gridSize": 11 },
-///   "profiles": { "rules": [{ "bundleID": "com.apple.Safari", "name": "Safari", "profile": "srgb" }], "fallback": "srgb" }
+///   "profiles": { "rules": [{ "bundleID": "com.apple.Safari", "name": "Safari", "profile": "srgb" }], "fallback": "srgb" },
+///   "soundEffects": true
 /// }
 /// ```
 ///
@@ -25,11 +26,13 @@ public struct AppSettings: Equatable, Sendable, Codable {
     public var loupe = LoupeSettings()
     /// Smart Profiles: Settings ▸ Profiles.
     public var profiles = SmartProfiles()
+    /// Whether picks and copies play their sounds: Settings ▸ General.
+    public var soundEffects = true
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, defaultFormat, shortcuts, loupe, profiles
+        case formatVersion, defaultFormat, shortcuts, loupe, profiles, soundEffects
     }
 
     public init(from decoder: any Decoder) throws {
@@ -41,6 +44,7 @@ public struct AppSettings: Equatable, Sendable, Codable {
         shortcuts = (try? container.decodeIfPresent(ShortcutBindings.self, forKey: .shortcuts)) ?? ShortcutBindings()
         loupe = (try? container.decodeIfPresent(LoupeSettings.self, forKey: .loupe)) ?? LoupeSettings()
         profiles = (try? container.decodeIfPresent(SmartProfiles.self, forKey: .profiles)) ?? SmartProfiles()
+        soundEffects = (try? container.decodeIfPresent(Bool.self, forKey: .soundEffects)) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -50,6 +54,7 @@ public struct AppSettings: Equatable, Sendable, Codable {
         try container.encode(shortcuts, forKey: .shortcuts)
         try container.encode(loupe, forKey: .loupe)
         try container.encode(profiles, forKey: .profiles)
+        try container.encode(soundEffects, forKey: .soundEffects)
     }
 }
 

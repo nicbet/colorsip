@@ -30,6 +30,7 @@ struct SettingsTests {
         #expect(settings.loupe.diameter == 200)
         #expect(settings.loupe.gridSize == 11)
         #expect(settings.profiles == SmartProfiles())
+        #expect(settings.soundEffects)
     }
 
     @Test func roundTrip() throws {
@@ -41,6 +42,7 @@ struct SettingsTests {
         settings.loupe.gridSize = 15
         settings.profiles.fallback = .genericRGB
         settings.profiles.removeRule(bundleID: "com.apple.Preview")
+        settings.soundEffects = false
         let decoded = try JSONDecoder.library.decode(AppSettings.self, from: JSONEncoder.library.encode(settings))
         #expect(decoded == settings)
     }
@@ -80,6 +82,11 @@ struct SettingsTests {
 
     @Test func unreadableProfilesFallBackToDefaults() throws {
         #expect(try decode(#"{ "formatVersion": 1, "profiles": 3 }"#).profiles == SmartProfiles())
+    }
+
+    @Test func unreadableSoundEffectsFallBackToOn() throws {
+        #expect(try decode(#"{ "formatVersion": 1, "soundEffects": "loud" }"#).soundEffects)
+        #expect(try decode(#"{ "formatVersion": 1, "soundEffects": false }"#).soundEffects == false)
     }
 
     @Test func newerFormatIsRejected() {

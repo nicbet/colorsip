@@ -11,6 +11,7 @@ final class AppModel {
     let permissions: Permissions
     let library: LibraryController
     let history: ColorHistoryController
+    let sounds: SoundEffects
     @ObservationIgnored private let clipboard = SystemClipboard()
     /// Opens the permissions guide on every missing permission; set by `AppDelegate`.
     @ObservationIgnored var startPermissionsGuide: @MainActor () -> Void = {}
@@ -33,12 +34,19 @@ final class AppModel {
         set { settings.update { $0.defaultFormat = newValue } }
     }
 
+    /// Settings ▸ General's "Play sound effects".
+    var soundEffectsEnabled: Bool {
+        get { settings.settings.soundEffects }
+        set { settings.update { $0.soundEffects = newValue } }
+    }
+
     init(
         loginItemService: any LoginItemService,
         hotKeyRegistrar: any HotKeyRegistrar,
         permissionChecker: any PermissionChecker,
         libraryStore: LibraryStore = LibraryStore(folder: LibraryStore.defaultFolder),
-        localSettings: LocalSettings = LocalSettings()
+        localSettings: LocalSettings = LocalSettings(),
+        soundPlayer: any SoundPlayer = NSSoundPlayer()
     ) {
         launchAtLogin = LaunchAtLogin(service: loginItemService)
         settings = SettingsStore(store: libraryStore)
@@ -46,15 +54,17 @@ final class AppModel {
         permissions = Permissions(checker: permissionChecker, localSettings: localSettings)
         library = LibraryController(store: libraryStore)
         history = ColorHistoryController(store: libraryStore)
+        sounds = SoundEffects(player: soundPlayer, settings: settings)
         self.localSettings = localSettings
         let pane = localSettings.settingsPane
         settingsPane = SettingsPane.visible(for: .current).contains(pane) ? pane : .general
         editorModel = localSettings.editorModel
     }
 
-    /// Copies `color` in `format`, or in the active format.
+    /// Copies `color` in `format`, or in the active format, with a plopp.
     func copy(_ color: CSipColor, as format: OutputFormat? = nil) {
         copyValue(of: color, as: format ?? outputFormat, to: clipboard)
+        sounds.play(.plopp)
     }
 
     /// Sends a pick to Color History, the pick target and the clipboard (`spec.md` §4.5).
