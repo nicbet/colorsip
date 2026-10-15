@@ -15,10 +15,7 @@ struct PaletteListView: View {
         ScrollViewReader { scroller in
             ScrollView(.vertical) {
                 LazyVStack(alignment: .leading, spacing: rowSpacing) {
-                    HistoryRow(
-                        swatches: model.history.history.swatches,
-                        format: model.outputFormat,
-                        copy: { model.copy($0, as: $1) })
+                    HistoryRow(swatches: model.history.history.swatches, model: model)
                     ForEach(library.palettes) { palette in
                         PaletteRow(
                             palette: palette,
@@ -67,11 +64,11 @@ private let paletteListSpace = "paletteList"
 /// The size of row labels: Color History's title and palette names.
 private let labelFontSize = 12.0
 
-/// Color History (`spec.md` §7.4): read-only, so no radio button, no lock and no icon.
+/// Color History (`spec.md` §7.4): read-only, so no radio button, no lock and no icon. Its swatches
+/// can be dragged out, but nothing can be dropped on it.
 struct HistoryRow: View {
     let swatches: [Swatch]
-    let format: OutputFormat
-    let copy: (CSipColor, OutputFormat) -> Void
+    let model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -80,7 +77,7 @@ struct HistoryRow: View {
             if swatches.isEmpty {
                 StripPlaceholder(label: "Picked colors appear here")
             } else {
-                SwatchStrip(swatches: swatches, format: format, copy: copy)
+                SwatchStrip(history: swatches, model: model)
             }
         }
     }
@@ -114,6 +111,10 @@ struct PaletteRow: View {
     let model: AppModel
     let reorder: PaletteReorder
 
+    /// Whether a swatch dragged over the header or the empty placeholder would be dropped here.
+    @State private var isHeaderTargeted = false
+    @State private var isPlaceholderTargeted = false
+
     private var library: LibraryController { model.library }
 
     var body: some View {
@@ -123,10 +124,20 @@ struct PaletteRow: View {
                     .frame(width: 16)
                 header
             }
+            .background(
+                isHeaderTargeted ? Color.accentColor.opacity(0.15) : .clear,
+                in: RoundedRectangle(cornerRadius: 4))
+            // The header and the empty placeholder add to the front of the ungrouped section.
+            .swatchDrop(model: model, palette: palette.id, slot: { _ in StripSlot(group: nil, index: 0) }) {
+                isHeaderTargeted = $0 != nil
+            }
             if palette.allSwatches.isEmpty {
-                StripPlaceholder(label: "Drop colors here")
+                StripPlaceholder(label: "Drop colors here", isTargeted: isPlaceholderTargeted)
+                    .swatchDrop(model: model, palette: palette.id, slot: { _ in StripSlot(group: nil, index: 0) }) {
+                        isPlaceholderTargeted = $0 != nil
+                    }
             } else {
-                SwatchStrip(palette: palette, format: model.outputFormat, copy: { model.copy($0, as: $1) }) { swatch, group in
+                SwatchStrip(palette: palette, model: model) { swatch, group in
                     AnyView(swatchMenu(swatch, in: group))
                 }
             }
@@ -291,11 +302,14 @@ private let stripCornerRadius = 6.0
 /// (`spec.md` §3.1), or an empty Color History.
 struct StripPlaceholder: View {
     let label: String
+    /// A dragged swatch would be dropped here, so the border turns the accent color.
+    var isTargeted = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: stripCornerRadius)
-            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            .foregroundStyle(.tertiary)
+            .strokeBorder(style: StrokeStyle(lineWidth: isTargeted ? 2 : 1, dash: [4, 3]))
+            .foregroundStyle(isTargeted ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+            .contentShape(Rectangle())
             .overlay {
                 Text(label)
                     .font(.body)
@@ -310,64 +324,94 @@ struct StripPlaceholder: View {
 /// comes from ``SwatchStripLayout``.
 struct SwatchStrip: View {
     private let makeLayout: (Double) -> SwatchStripLayout
-    let format: OutputFormat
-    let copy: (CSipColor, OutputFormat) -> Void
+    let model: AppModel
     /// Context menu items after Copy as, for a swatch in a group (`nil` for the ungrouped section).
     private let menu: (Swatch, SwatchGroup.ID?) -> AnyView
+    /// What dragging a swatch in a section drags.
+    private let dragSource: (Swatch, SwatchGroup.ID?) -> SwatchDragSource
+    /// The palette swatches dropped on the strip go into; `nil` for Color History, which takes none.
+    private let dropPalette: Palette.ID?
 
     @State private var offset = 0.0
     @State private var copied: Swatch.ID?
+    /// Where a dragged swatch would be dropped, while it's over the strip.
+    @State private var dropSlot: StripSlot?
+
+    private var format: OutputFormat { model.outputFormat }
 
     /// A palette's strip: its ungrouped section, then each group.
-    init(
-        palette: Palette, format: OutputFormat, copy: @escaping (CSipColor, OutputFormat) -> Void,
-        menu: @escaping (Swatch, SwatchGroup.ID?) -> AnyView
-    ) {
+    init(palette: Palette, model: AppModel, menu: @escaping (Swatch, SwatchGroup.ID?) -> AnyView) {
         makeLayout = { SwatchStripLayout(palette: palette, width: $0) }
-        self.format = format
-        self.copy = copy
+        self.model = model
         self.menu = menu
+        dragSource = { .palette($0.id, in: SectionID(palette: palette.id, group: $1)) }
+        dropPalette = palette.id
     }
 
-    /// One section of `swatches`, such as Color History. Its swatches only offer Copy as.
-    init(swatches: [Swatch], format: OutputFormat, copy: @escaping (CSipColor, OutputFormat) -> Void) {
+    /// Color History's strip. Its swatches only offer Copy as, and dragging them copies.
+    init(history swatches: [Swatch], model: AppModel) {
         makeLayout = { SwatchStripLayout(swatches: swatches, width: $0) }
-        self.format = format
-        self.copy = copy
+        self.model = model
         menu = { _, _ in AnyView(EmptyView()) }
+        dragSource = { swatch, _ in .history(swatch) }
+        dropPalette = nil
     }
 
     var body: some View {
         GeometryReader { proxy in
             let layout = makeLayout(proxy.size.width - 2 * stripInset)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SwatchStripLayout.groupGap) {
-                    ForEach(layout.sections) { section in
-                        HStack(spacing: 0) {
-                            ForEach(section.swatches) { swatch in
-                                cell(swatch, in: section.group)
-                                    .frame(width: layout.segmentWidth)
-                            }
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: stripCornerRadius))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: stripCornerRadius)
-                                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
-                        }
-                        .shadow(color: .black.opacity(0.15), radius: 1.5, y: 0.5)
-                    }
-                }
-                .frame(height: stripHeight)
-                .padding(stripInset)
-            }
-            .scrollDisabled(!layout.isScrollable)
-            .onScrollGeometryChange(for: Double.self) { $0.contentOffset.x + $0.contentInsets.leading } action: {
-                offset = $1
-            }
-            .mask(fadeMask(layout.fades(offset: offset)))
-            .animation(.easeOut(duration: 0.15), value: layout.fades(offset: offset))
+            strip(layout)
+                .overlay(alignment: .leading) { insertionLine(layout) }
+                .modifier(StripDrop(model: model, palette: dropPalette, slot: { point in
+                    layout.dropSlot(at: point.x - stripInset + offset)
+                }, targeted: { dropSlot = $0 }))
         }
         .frame(height: stripHeight + 2 * stripInset)
+    }
+
+    /// The accent line at the slot a drop would go into. Hidden when the drop wouldn't change
+    /// anything.
+    @ViewBuilder private func insertionLine(_ layout: SwatchStripLayout) -> some View {
+        if let dropSlot, let palette = dropPalette, let drag = model.drag,
+           let x = layout.insertionX(for: dropSlot),
+           !SwatchDrag.isUnchanged(
+               drag, onto: SectionID(palette: palette, group: dropSlot.group), at: dropSlot.index,
+               in: model.library.library, option: NSEvent.modifierFlags.contains(.option)) {
+            Capsule()
+                .fill(.tint)
+                .frame(width: 2, height: stripHeight + 2 * stripInset)
+                .offset(x: x + stripInset - offset - 1)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func strip(_ layout: SwatchStripLayout) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SwatchStripLayout.groupGap) {
+                ForEach(layout.sections) { section in
+                    HStack(spacing: 0) {
+                        ForEach(section.swatches) { swatch in
+                            cell(swatch, in: section.group)
+                                .frame(width: layout.segmentWidth)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: stripCornerRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: stripCornerRadius)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.15), radius: 1.5, y: 0.5)
+                }
+            }
+            .frame(height: stripHeight)
+            .padding(stripInset)
+        }
+        .scrollDisabled(!layout.isScrollable)
+        .onScrollGeometryChange(for: Double.self) { $0.contentOffset.x + $0.contentInsets.leading } action: {
+            offset = $1
+        }
+        .mask(fadeMask(layout.fades(offset: offset)))
+        .animation(.easeOut(duration: 0.15), value: layout.fades(offset: offset))
     }
 
     private func cell(_ swatch: Swatch, in group: SwatchGroup.ID?) -> some View {
@@ -381,8 +425,18 @@ struct SwatchStrip: View {
                         .transition(.opacity)
                 }
             }
+            .overlay {
+                // A refused duplicate drop points at the swatch that's already there.
+                if model.highlightedSwatch == swatch.id {
+                    Rectangle()
+                        .strokeBorder(swatch.color.prefersDarkForeground ? Color.black : Color.white, lineWidth: 2)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.3), value: model.highlightedSwatch == swatch.id)
             .contentShape(Rectangle())
             .onTapGesture { copyAndConfirm(swatch, as: format) }
+            .swatchDrag(swatch, as: dragSource(swatch, group), model: model)
             .help("\(swatch.name) — \(format.string(for: swatch.color))")
             .contextMenu {
                 Menu("Copy as") {
@@ -398,7 +452,7 @@ struct SwatchStrip: View {
 
     /// Copies the value and shows a check mark on the swatch for about a second.
     private func copyAndConfirm(_ swatch: Swatch, as format: OutputFormat) {
-        copy(swatch.color, format)
+        model.copy(swatch.color, as: format)
         withAnimation(.easeOut(duration: 0.1)) { copied = swatch.id }
         Task {
             try? await Task.sleep(for: .seconds(1))

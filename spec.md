@@ -258,9 +258,13 @@ reduction.
 ### 7.5 Drag and drop
 - Swatches can be dragged between palettes, between groups, within a group (to reorder), and from
   Color History. A plain drag between palettes **moves** the swatch; Option-drag **copies** it.
-  Dragging out of Color History always copies.
-- Users can drop onto a palette strip, onto a group header, or onto the empty "Drop colors here"
-  area.
+  Dragging out of Color History, or out of a locked palette, always copies.
+- Users can drop onto a palette strip, where the pointer picks the group (or the ungrouped section)
+  and the position in it; onto a palette's header, which adds to the front of the ungrouped
+  section; or onto the empty "Drop colors here" area. Groups have no headers of their own in the
+  strip, so empty groups can't be dropped on in the popover.
+- A drop that would duplicate a color in its group is refused, and the existing swatch briefly
+  highlights (§7.2). Locked palettes refuse drops.
 - Dragging a swatch to other apps provides the value as text in the active format (plus an
   `NSColor` pasteboard type).
 

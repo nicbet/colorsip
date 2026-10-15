@@ -33,6 +33,9 @@ struct PopoverView: View {
         }
         .frame(width: 320)
         .background { undoRedoKeys }
+        // The drag session clears the drag when it ends; closing the popover does too, in case it
+        // closes mid-drag.
+        .onDisappear { model.drag = nil }
     }
 
     /// Cmd+Z and Shift+Cmd+Z for library changes (`spec.md` §7.6), as invisible buttons so their key

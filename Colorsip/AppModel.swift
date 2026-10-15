@@ -61,6 +61,34 @@ final class AppModel {
     func newPalette() {
         edit = .renamePalette(library.newPalette())
     }
+
+    // MARK: - Drag and drop (`spec.md` §7.5)
+
+    /// The swatch being dragged in the popover. The drag's pasteboard only carries the value for
+    /// other apps, and SwiftUI's drop targets can't read it back anyway, so drop targets in the
+    /// popover learn what is dragged from here. It's cleared when the drag session ends, so a
+    /// cancelled drag can't be mistaken for a later drag from another app, and when the popover
+    /// closes.
+    var drag: SwatchDragSource?
+    /// The swatch a refused duplicate drop points at, ringed for about a second (`spec.md` §7.2).
+    var highlightedSwatch: Swatch.ID?
+
+    /// Drops the current drag into `slot` of `destination`.
+    func dropDrag(onto destination: SectionID, at slot: Int, option: Bool) {
+        defer { drag = nil }
+        guard let drag else { return }
+        if case .duplicate(let existing) = library.dropSwatch(drag, onto: destination, at: slot, option: option) {
+            highlight(existing)
+        }
+    }
+
+    private func highlight(_ swatch: Swatch.ID) {
+        highlightedSwatch = swatch
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            if highlightedSwatch == swatch { highlightedSwatch = nil }
+        }
+    }
 }
 
 /// An edit in progress in the popover: the small popover anchored to a palette row shows it.

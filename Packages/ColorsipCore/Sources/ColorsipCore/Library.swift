@@ -90,6 +90,11 @@ public struct SectionID: Hashable, Sendable {
     /// `nil` for the ungrouped section.
     public var group: SwatchGroup.ID?
 
+    public init(palette: Palette.ID, group: SwatchGroup.ID?) {
+        self.palette = palette
+        self.group = group
+    }
+
     public static func ungrouped(_ palette: Palette.ID) -> SectionID {
         SectionID(palette: palette, group: nil)
     }
