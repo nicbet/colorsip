@@ -12,7 +12,8 @@ Android.
 Colorsip is open source (MIT) and distributed as source only: there are no pre-built binaries and
 no App Store version. You build it yourself (see [Build from source](#build-from-source)).
 
-The product spec is in [`spec.md`](spec.md).
+The current release is 1.0.0. What changed in each release is in [`CHANGELOG.md`](CHANGELOG.md),
+and the product spec is in [`spec.md`](spec.md).
 
 ## Features
 
@@ -22,6 +23,8 @@ The product spec is in [`spec.md`](spec.md).
 - **Palettes with groups.** Give a palette an emoji or SF Symbol icon and a description, split it
   into named groups, duplicate it, or lock it against changes. The radio button picks the palette
   new picks go into.
+- **Starter Palettes.** Add the Tailwind CSS v4 color palettes to your library, one at a time or
+  all at once, in Settings ▸ Palettes.
 - **Color History.** The last 16 picks, newest first. Picking a color again moves it to the front.
 - **Picker and loupe.** A magnified pixel grid that follows the pointer across displays, with the
   color's friendly name (from about 30,000 names) and value under it. Hold Option to switch the
@@ -124,12 +127,13 @@ registered. The global shortcut needs no permission.
 ## Build from source
 
 ```sh
-git clone https://github.com/nicbet/colorsip.git
+git clone --branch v1.0.0 https://github.com/nicbet/colorsip.git
 cd colorsip
 make build
 ```
 
-This builds `Builds/Colorsip.app`. To install it, copy it into `/Applications`. Run `make` for the
+Leave out `--branch v1.0.0` to build the latest unreleased code on `main`. This builds
+`Builds/Colorsip.app`. To install it, copy it into `/Applications`. Run `make` for the
 other tasks.
 
 You can also open `Colorsip.xcodeproj`, select the **Colorsip** scheme and press **Run** (⌘R). The
@@ -196,7 +200,7 @@ swatches are `color` tokens, with Colorsip's own data (ids, icon, lock, order, t
 [`schema/colorsip-palette.schema.json`](schema/colorsip-palette.schema.json), so other tools can
 read and validate these files.
 
-Import and export (Colorsip, ASE, CLR, JSON and PDF) are planned for the next release. Until then,
+Import and export (Colorsip, ASE, CLR, JSON and PDF) are planned for a later release. Until then,
 you can back up or share a palette by copying its file. Quit Colorsip before you put a file into
 `palettes/`.
 
