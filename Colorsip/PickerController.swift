@@ -5,7 +5,7 @@ import ColorsipCore
 /// reports each pick. A thin layer over `PickerSession`.
 @MainActor
 final class PickerController {
-    /// Called for every pick, as it is made; a multi session calls it several times.
+    /// Called for every pick, as it is made; Shift+clicks call it several times in one session.
     var onPick: @MainActor (CSipColor) -> Void = { _ in }
     /// Called instead of `onPick` for a Cmd+click pick, after the picker closed, with the app that
     /// was active before it opened.
@@ -51,8 +51,9 @@ final class PickerController {
         session = PickerSession(
             displays: displays, loupe: model.settings.settings.loupe, point: NSEvent.mouseLocation,
             windows: Self.otherAppsWindows(), profiles: model.settings.settings.profiles,
-            optionHeld: NSEvent.modifierFlags.contains(.option))
+            format: model.outputFormat, optionHeld: NSEvent.modifierFlags.contains(.option))
         session?.shiftChanged(isDown: NSEvent.modifierFlags.contains(.shift))
+        session?.commandChanged(isDown: NSEvent.modifierFlags.contains(.command))
         panels = screens.map { screen, id in PickerOverlayPanel(screen: screen, displayID: id, content: LoupeView()) }
 
         // Colorsip isn't activated: the app under the pointer keeps its active appearance. The
@@ -118,6 +119,7 @@ final class PickerController {
                 command: event.modifierFlags.contains(.command)))
         case .flagsChanged:
             session.shiftChanged(isDown: event.modifierFlags.contains(.shift))
+            session.commandChanged(isDown: event.modifierFlags.contains(.command))
             optionChanged(isDown: event.modifierFlags.contains(.option), session: session)
             return false
         case .rightMouseDown:
@@ -149,18 +151,18 @@ final class PickerController {
         case 126: direction = .up
         default: return true  // Swallow other keys while picking.
         }
-        guard session.modeMenu == nil else { return true }
+        guard session.formatMenu == nil else { return true }
         warp(to: session.arrow(direction, shift: shift))
         resample()
         return true
     }
 
-    /// Option opens the mode menu and shows the cursor so it can reach the menu; releasing it puts
+    /// Option opens the format menu and shows the cursor so it can reach the menu; releasing it puts
     /// the pointer back under the frozen loupe.
     private func optionChanged(isDown: Bool, session: PickerSession) {
-        let wasOpen = session.modeMenu != nil
+        let wasOpen = session.formatMenu != nil
         let frozen = session.optionChanged(isDown: isDown)
-        if !wasOpen && session.modeMenu != nil {
+        if !wasOpen && session.formatMenu != nil {
             NSCursor.unhide()
         } else if let frozen {
             warp(to: frozen)
@@ -186,7 +188,9 @@ final class PickerController {
         case .close:
             close()
         case .none:
-            resample()  // A mode chosen in the menu.
+            // A format chosen in the menu becomes the app's format, like the popover's dropdown.
+            if let session, session.format != model.outputFormat { model.outputFormat = session.format }
+            resample()
         }
     }
 
@@ -233,8 +237,8 @@ final class PickerController {
             gridSize: session.loupe.gridSize,
             samples: session.samples,
             colorSpace: sampler.frame?.colorSpace,
-            label: session.label(format: model.outputFormat),
-            menu: session.modeMenu.map { LoupeView.Menu(layout: $0, mode: session.mode, hovered: session.hoveredMode) })
+            label: session.label(),
+            menu: session.formatMenu.map { LoupeView.Menu(layout: $0, format: session.format, hovered: session.hoveredFormat) })
         for panel in panels {
             (panel.contentView as? LoupeView)?.content = panel.displayID == session.display.id ? content : nil
         }
@@ -262,8 +266,8 @@ final class PickerController {
         screenObserver = nil
         panels.forEach { $0.orderOut(nil) }
         panels = []
-        // With the mode menu open, the cursor is already showing.
-        if session.modeMenu == nil { NSCursor.unhide() }
+        // With the format menu open, the cursor is already showing.
+        if session.formatMenu == nil { NSCursor.unhide() }
         // Saved once per session, not on every wheel notch.
         model.settings.update { $0.loupe = session.loupe }
     }

@@ -16,15 +16,6 @@ public enum TargetProfile: String, CaseIterable, Sendable, Codable {
         }
     }
 
-    /// The loupe label's badge.
-    public var badge: String {
-        switch self {
-        case .srgb: "sRGB"
-        case .displayP3: "P3"
-        case .genericRGB: "Generic"
-        }
-    }
-
     public var displayName: String {
         switch self {
         case .srgb: "sRGB IEC61966-2.1"

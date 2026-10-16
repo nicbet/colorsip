@@ -8,7 +8,6 @@ struct PaletteListView: View {
     let model: AppModel
 
     @State private var reorder = PaletteReorder()
-    @State private var contentHeight = 0.0
 
     var body: some View {
         let library = model.library.library
@@ -41,10 +40,9 @@ struct PaletteListView: View {
                             .offset(y: y - 1)
                     }
                 }
-                .listContainer()
-                .padding(.horizontal, 10)
-                .onGeometryChange(for: Double.self) { $0.size.height } action: { contentHeight = $0 }
+                .padding(10)
             }
+            .scrollIndicators(.never)
             .onScrollGeometryChange(for: Double.self) { $0.contentOffset.y } action: { _, _ in
                 SwatchHoverPanel.shared.hide()
             }
@@ -53,13 +51,11 @@ struct PaletteListView: View {
                 withAnimation { scroller.scrollTo(edit.palette) }
             }
         }
-        // As tall as the list, so the popover fits it, until it scrolls.
-        .frame(height: min(contentHeight, maxListHeight))
+        // The panel stays put and the rows scroll inside it, so its rounded corners always show.
+        .listContainer()
+        .padding(.horizontal, 10)
     }
 }
-
-/// The tallest the list gets before it scrolls, which keeps the popover near 420 pt.
-private let maxListHeight = 300.0
 
 private let rowSpacing = 14.0
 /// The coordinate space of the list's rows, for dragging palettes.
@@ -88,7 +84,8 @@ struct HistoryRow: View {
 
 extension View {
     /// The list's container: one rounded panel, white with black text in light mode and black with
-    /// white text in dark mode, so colors sit on a neutral background.
+    /// white text in dark mode, so colors sit on a neutral background. It clips its content to the
+    /// rounded shape.
     func listContainer() -> some View { modifier(ListContainer()) }
 }
 
@@ -99,9 +96,29 @@ private struct ListContainer: ViewModifier {
         let isDark = colorScheme == .dark
         content
             .foregroundStyle(isDark ? Color.white : Color.black)
-            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isDark ? Color.black : Color.white, in: RoundedRectangle(cornerRadius: 12))
+            .background(isDark ? Color.black : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// A locked palette's rounded light grey background. It reaches into the list's side padding, so
+/// the row's content lines up with the unlocked rows.
+private struct LockedBackground: ViewModifier {
+    let isLocked: Bool
+    let isDark: Bool
+
+    func body(content: Content) -> some View {
+        if isLocked {
+            content
+                .padding(6)
+                .background(
+                    isDark ? Color.white.opacity(0.08) : Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255),
+                    in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, -6)
+        } else {
+            content
+        }
     }
 }
 
@@ -117,6 +134,7 @@ struct PaletteRow: View {
     /// Whether a swatch dragged over the header or the empty placeholder would be dropped here.
     @State private var isHeaderTargeted = false
     @State private var isPlaceholderTargeted = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private var library: LibraryController { model.library }
 
@@ -145,6 +163,7 @@ struct PaletteRow: View {
                 }
             }
         }
+        .modifier(LockedBackground(isLocked: palette.isLocked, isDark: colorScheme == .dark))
         .contentShape(Rectangle())
         .opacity(reorder.dragging == palette.id ? 0.4 : 1)
         .contextMenu { paletteMenu }
@@ -391,7 +410,7 @@ struct SwatchStrip: View {
     }
 
     private func strip(_ layout: SwatchStripLayout) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
             HStack(spacing: SwatchStripLayout.groupGap) {
                 ForEach(layout.sections) { section in
                     HStack(spacing: 0) {
@@ -411,6 +430,7 @@ struct SwatchStrip: View {
             .frame(height: stripHeight)
             .padding(stripInset)
         }
+        .scrollIndicators(.never)
         .scrollDisabled(!layout.isScrollable)
         .onScrollGeometryChange(for: Double.self) { $0.contentOffset.x + $0.contentInsets.leading } action: {
             offset = $1

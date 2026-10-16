@@ -24,7 +24,8 @@ The product spec is in [`spec.md`](spec.md).
   new picks go into.
 - **Color History.** The last 16 picks, newest first. Picking a color again moves it to the front.
 - **Picker and loupe.** A magnified pixel grid that follows the pointer across displays, with the
-  value and a friendly name (from about 30,000 names) under it.
+  color's friendly name (from about 30,000 names) and value under it. Hold Option to switch the
+  output format without leaving the picker.
 - **Color profiles (Smart Profiles).** A pick is converted to the profile of the app under the
   pointer: sRGB for browsers and Figma, Display P3 for Xcode, Sketch, Pixelmator Pro and Preview.
   You can change the list and the fallback in Settings ▸ Profiles.
@@ -42,11 +43,13 @@ The product spec is in [`spec.md`](spec.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/picker-dark.webp">
-  <img src="docs/picker-light.webp" alt="The picker's loupe on the corner of a coral tile, labelled #ff7f6e, sRGB, Hipster Salmon">
+  <img src="docs/picker-light.webp" alt="The picker's loupe on the corner of a coral tile, labelled Hipster Salmon, #ff7f6e, with sRGB IEC61966-2.1 below">
 </picture>
 
 Start the picker with **⌃⌥⌘P** or the eyedropper in the popover. The label under the loupe shows
-the value in the active format, the profile it was converted to, and the color's name.
+a swatch, the color's name and its value in the active format, with the profile it was converted
+to below. Small badges show what the next click does: a stack while Shift is held (keep
+picking), a paper plane while Cmd is held (paste).
 
 | Input | Action |
 |---|---|
@@ -57,8 +60,8 @@ the value in the active format, the profile it was converted to, and the color's
 | Shift+arrow keys | Move ten pixels |
 | Mouse wheel | Resize the loupe (120–400 pt) |
 | Option+mouse wheel | Change the grid size (5–31 pixels across) |
-| Hold Option | Show the mode menu: **Single** (the first pick closes the picker) or **Multi** (every click picks; Esc, or Return without moving, finishes) |
-| Esc | Close the picker. In multi mode, colors you already picked are kept |
+| Hold Option | Show the format menu. Click a format to make it the active one; the label changes at once |
+| Esc | Close the picker. Colors you already picked with Shift+click are kept |
 
 Every pick goes into Color History and into the palette whose radio button is on (unless it is
 locked), and its value is copied to the clipboard. Settings ▸ Picker sets the loupe size and grid

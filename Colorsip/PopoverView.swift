@@ -20,13 +20,14 @@ struct PopoverView: View {
             // The color editor takes the popover over, like a sheet, until Done or Cancel.
             if model.colorEditor != nil {
                 ColorEditorView(model: model, repick: actions.repick)
+                    .frame(maxHeight: .infinity, alignment: .top)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
                 content
                     .background { undoRedoKeys }
             }
         }
-        .frame(width: 320)
+        .frame(width: 350, height: 645)
         .animation(.easeOut(duration: 0.2), value: model.colorEditor == nil)
         .onChange(of: model.library.library) { model.closeEditorIfSwatchIsGone() }
         // The drag session clears the drag when it ends; closing the popover does too, in case it

@@ -28,7 +28,7 @@ binaries and no App Store version.
 
 | Release | Scope |
 |---|---|
-| **MVP** | Menubar app, palettes with named groups, Color History, picker (single and multi pick, precise movement, Cmd+click paste), color profiles / Smart Profiles, global shortcut, settings, permissions onboarding |
+| **MVP** | Menubar app, palettes with named groups, Color History, picker (single pick, Shift+click to keep picking, format switching, precise movement, Cmd+click paste), color profiles / Smart Profiles, global shortcut, settings, permissions onboarding |
 | **V2** | Main window app, import/export, contrast checker (including the picker's contrast mode), color vision simulation |
 | **V3** | Smart Formats, templates, file-system sync |
 | Later / not planned | Color Dock, custom format templates, import of third-party formats |
@@ -117,20 +117,23 @@ A three-pane window, opened from the popover's bottom bar or a user-assigned glo
 
 | Input | Action |
 |---|---|
-| Click / Return / Space | Pick the color and close the picker (single mode) |
+| Click / Return / Space | Pick the color and close the picker |
 | Shift + click | Pick the color and keep the picker open |
 | Cmd + click | Pick the color, close the picker, and paste the value into the active app (§4.5) |
 | Arrow keys | Move 1 pixel (a physical pixel of the display) |
 | Shift + arrow keys | Move 10 pixels |
-| Hold Option | Show the mode popover menu next to the loupe |
-| Esc | Cancel and close. In multi mode, colors already picked are kept |
+| Hold Option | Show the format menu next to the loupe (§4.4) |
+| Esc | Cancel and close. Colors already picked with Shift+click are kept |
 
-### 4.4 Modes
-The Option popover menu switches between modes:
-- **Single** (default): the first pick closes the picker.
-- **Multi**: every click picks a color. Esc or Return without moving finishes.
-- **Contrast** (V2): pick the text color, then the background color. The contrast checker then
-  opens with both.
+### 4.4 Format menu
+Holding Option shows every output format in a menu beside the loupe, the active one checked. The
+loupe freezes and the cursor shows so it can reach the menu. Clicking a format makes it the active
+format, the same setting as the popover's format dropdown, so it stays after the picker closes; the
+label shows the new value at once. Releasing Option puts the pointer back under the loupe.
+
+There are no picker modes: Shift+click keeps the picker open for the next pick. The contrast pick
+(V2: the text color, then the background color, then the contrast checker opens with both) needs
+its own entry point.
 
 ### 4.5 Where picks go
 - Every pick goes into **Color History**.
@@ -144,7 +147,7 @@ The Option popover menu switches between modes:
   This needs the Accessibility permission. If the permission is missing, the value is only copied,
   and the user is pointed to the onboarding step (§9).
 - **Sounds**: a pick that closes the picker (single pick, Cmd+click paste, the color editor's
-  eyedropper) plays a "slurp"; a pick that keeps it open (Shift+click, multi mode) plays a
+  eyedropper) plays a "slurp"; a pick that keeps it open (Shift+click) plays a
   shorter pick sound. Esc is silent. A repeated sound restarts instead of queueing. Settings ▸
   General can turn sounds off.
 

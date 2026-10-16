@@ -10,10 +10,6 @@ struct TargetProfileTests {
         #expect(TargetProfile.genericRGB.colorSpace == .genericRGB)
     }
 
-    @Test func badges() {
-        #expect(TargetProfile.allCases.map(\.badge) == ["sRGB", "P3", "Generic"])
-    }
-
     @Test func rawValuesAreTheColorSpaceNames() {
         #expect(TargetProfile.allCases.map(\.rawValue) == ["srgb", "display-p3", "generic-rgb"])
     }
