@@ -10,7 +10,7 @@ Android.
 </picture>
 
 Colorsip is open source (MIT) and distributed as source only: there are no pre-built binaries and
-no App Store version. You build it yourself (see [Build from source](#build-from-source)).
+no App Store version. You build it yourself (see [Building it yourself](#building-it-yourself)).
 
 The current release is 1.0.0. What changed in each release is in [`CHANGELOG.md`](CHANGELOG.md),
 and the product spec is in [`spec.md`](spec.md).
@@ -124,17 +124,26 @@ registered. The global shortcut needs no permission.
 - macOS 15.8 or later
 - Xcode 26 or later
 
-## Build from source
+## Building it yourself
+
+There are no prebuilt downloads: build it from source. You don't need an Apple Developer account.
+Dev dependencies:
+
+- Xcode 26 or later, for `xcodebuild` and `codesign`
+- Optional: `cwebp` (`brew install webp`), only for `make screenshots`
 
 ```sh
 git clone --branch v1.0.0 https://github.com/nicbet/colorsip.git
 cd colorsip
+make signing-cert   # once: create a local code-signing certificate
 make build
 ```
 
-Leave out `--branch v1.0.0` to build the latest unreleased code on `main`. This builds
-`Builds/Colorsip.app`. To install it, copy it into `/Applications`. Run `make` for the
-other tasks.
+The certificate keeps macOS permissions working across rebuilds; see
+[Keep permissions across rebuilds](#keep-permissions-across-rebuilds). Leave out
+`--branch v1.0.0` to build the latest unreleased code on `main`. This builds
+`Builds/Colorsip.app`. To install it, copy it into `/Applications`. Run `make` for the other
+tasks.
 
 You can also open `Colorsip.xcodeproj`, select the **Colorsip** scheme and press **Run** (⌘R). The
 project uses "Sign to Run Locally", so you don't need an Apple Developer account.
@@ -166,10 +175,14 @@ To fix that, create a local code-signing certificate once:
 make signing-cert
 ```
 
-This creates a self-signed certificate named "Colorsip Local Signing" in your login keychain,
-trusts it for code signing only (macOS asks for your password), and writes the untracked
-`Config/Signing.local.xcconfig` so Xcode signs with it too. `make build` uses it whenever it is in
-your keychain. On the first signed build, macOS asks whether `codesign` may use the key: click
+This runs [`scripts/create-signing-cert.sh`](scripts/create-signing-cert.sh). It creates a
+self-signed certificate named "Colorsip Local Signing" with `openssl` (valid for 10 years, limited
+to code signing), imports it with its key into your login keychain, trusts it for code signing only
+(macOS asks for your password), and writes the untracked `Config/Signing.local.xcconfig` so Xcode
+signs with it too. `make build` checks for the identity with `security find-identity -v -p
+codesigning` and passes it to `xcodebuild` whenever it is in your keychain; otherwise it signs ad
+hoc and says so. To remove the certificate, delete "Colorsip Local Signing" (certificate and key)
+in Keychain Access. On the first signed build, macOS asks whether `codesign` may use the key: click
 **Always Allow**.
 
 Then clear the old grants and grant the permissions once more:
