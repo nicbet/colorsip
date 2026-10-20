@@ -31,7 +31,7 @@ else
 SIGNING_FLAGS :=
 endif
 
-.PHONY: help build test snapshot screenshots clean signing-cert reset-permissions
+.PHONY: help build install run test snapshot screenshots clean signing-cert reset-permissions
 
 help:
 	@printf '%s\n' \
@@ -39,6 +39,8 @@ help:
 		'  help               Show this help message' \
 		'  build              Build the Colorsip app in Release configuration into $(BUILD_DIR)/' \
 		'                     (VERBOSE=1 for full xcodebuild output)' \
+		'  install            Build and copy Colorsip.app to /Applications' \
+		'  run                Build and launch Colorsip.app from $(BUILD_DIR)/' \
 		'  test               Run the ColorsipCore test suite' \
 		'  snapshot           Render the popover, picker, editor and Settings to $(SNAPSHOT_DIR)/' \
 		'  screenshots        Refresh the README screenshots in docs/ (needs cwebp: brew install webp)' \
@@ -55,6 +57,16 @@ endif
 	@rm -rf $(BUILD_DIR)/$(SCHEME).app
 	@ditto $(APP_PATH) $(BUILD_DIR)/$(SCHEME).app
 	@echo 'Built $(BUILD_DIR)/$(SCHEME).app'
+
+install: build
+	@pkill -x $(SCHEME) || true
+	@rm -rf /Applications/$(SCHEME).app
+	@ditto $(BUILD_DIR)/$(SCHEME).app /Applications/$(SCHEME).app
+	@echo 'Installed /Applications/$(SCHEME).app'
+
+run: build
+	@pkill -x $(SCHEME) || true
+	@open $(BUILD_DIR)/$(SCHEME).app
 
 test:
 	$(SWIFT) test --package-path $(CORE_PACKAGE_DIR)

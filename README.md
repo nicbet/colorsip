@@ -133,17 +133,16 @@ Dev dependencies:
 - Optional: `cwebp` (`brew install webp`), only for `make screenshots`
 
 ```sh
-git clone --branch v1.0.0 https://github.com/nicbet/colorsip.git
+git clone https://github.com/nicbet/colorsip.git
 cd colorsip
-make signing-cert   # once: create a local code-signing certificate
-make build
+make signing-cert   # 1. once: create your local signing certificate (see below)
+make install        # 2. build the release app and install it in /Applications
 ```
 
 The certificate keeps macOS permissions working across rebuilds; see
-[Keep permissions across rebuilds](#keep-permissions-across-rebuilds). Leave out
-`--branch v1.0.0` to build the latest unreleased code on `main`. This builds
-`Builds/Colorsip.app`. To install it, copy it into `/Applications`. Run `make` for the other
-tasks.
+[Keep permissions across rebuilds](#keep-permissions-across-rebuilds). `make build` builds
+`Builds/Colorsip.app` without installing it, and `make run` launches that build. Run `make` for
+the other tasks.
 
 You can also open `Colorsip.xcodeproj`, select the **Colorsip** scheme and press **Run** (⌘R). The
 project uses "Sign to Run Locally", so you don't need an Apple Developer account.
