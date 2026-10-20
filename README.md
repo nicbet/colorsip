@@ -247,6 +247,9 @@ your library.
 
 MIT. See [`LICENSE`](LICENSE).
 
+The sound effects in `Colorsip/Sounds/` were made for Colorsip by Nicolas Bettenburg and are
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ## Third-party
 
 - Color names come from [meodai/color-name-list](https://github.com/meodai/color-name-list)
